@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050914" />
+    <meta name="description" content="Explore the night sky from any place and time, from a planetarium dome to real deep-sky survey imagery." />
+    <title>Night Sky Atlas — an open planetarium</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Night Sky Atlas home">
+          <span class="brand-mark" aria-hidden="true"><i></i></span>
+          <span><strong>Night Sky</strong><small>ATLAS</small></span>
+        </a>
+
+        <div class="search-wrap">
+          <label class="sr-only" for="searchInput">Find a celestial object</label>
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="searchInput" type="search" autocomplete="off" placeholder="Find Orion, Andromeda, Saturn…" />
+          <kbd>/</kbd>
+          <div id="searchResults" class="search-results" hidden></div>
+        </div>
+
+        <div class="header-actions">
+          <button id="tonightToggle" class="chip-button tonight-button" aria-expanded="false" aria-controls="inspector">
+            <span class="tonight-spark" aria-hidden="true">✦</span><span>Tonight</span>
+          </button>
+          <button id="locationToggle" class="chip-button" aria-expanded="false" aria-controls="locationPanel">
+            <span class="status-dot"></span><span id="locationName">New York City</span><span aria-hidden="true">⌄</span>
+          </button>
+          <button id="aboutToggle" class="icon-button" aria-label="About and data sources">i</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section id="skyStage" class="sky-stage" aria-label="Interactive sky view">
+          <img id="surveyImage" class="survey-image" alt="Astronomical sky survey at the current coordinates" />
+          <div id="surveyEmpty" class="survey-empty" aria-hidden="true"></div>
+          <canvas id="skyCanvas" tabindex="0" aria-label="Planetarium. Drag to look around, scroll to zoom, and click celestial objects for details."></canvas>
+
+          <div class="view-readout" aria-live="polite">
+            <div><span id="viewMode">LOCAL SKY</span><strong id="viewDirection">Zenith · 180° field</strong></div>
+            <span id="skyCondition" class="condition"><i></i> Night sky</span>
+          </div>
+
+          <div id="surveyBadge" class="survey-badge" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="surveyStatus">Loading survey image…</span>
+          </div>
+
+          <div class="zoom-rail" aria-label="Zoom controls">
+            <button id="zoomIn" aria-label="Zoom in">+</button>
+            <div class="zoom-track"><span id="zoomTrackFill"></span></div>
+            <button id="zoomOut" aria-label="Zoom out">−</button>
+            <button id="resetView" aria-label="Reset view" title="Reset view">⌂</button>
+          </div>
+
+          <div class="layer-controls">
+            <button id="layersToggle" class="chip-button" aria-expanded="false"><span aria-hidden="true">◫</span> Layers</button>
+            <div id="layersPanel" class="floating-panel layers-panel" hidden>
+              <div class="panel-kicker">Sky layers</div>
+              <label><input id="starsLayer" type="checkbox" checked /> <span>Stars & planets</span></label>
+              <label><input id="objectsLayer" type="checkbox" checked /> <span>Deep-sky objects</span></label>
+              <label><input id="constellationsLayer" type="checkbox" checked /> <span>Constellation guides</span></label>
+              <label><input id="gridLayer" type="checkbox" checked /> <span>Coordinate grid</span></label>
+              <label><input id="labelsLayer" type="checkbox" checked /> <span>Object labels</span></label>
+              <hr />
+              <label for="surveySelect">Deep survey</label>
+              <select id="surveySelect">
+                <option value="auto">Auto — best available</option>
+                <option value="dss">DSS2 — optical</option>
+                <option value="panstarrs">Pan-STARRS — deep optical</option>
+                <option value="2mass">2MASS — infrared</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+          </div>
+
+          <section id="locationPanel" class="floating-panel location-panel" hidden>
+            <div class="panel-heading">
+              <div><span class="panel-kicker">Observer location</span><strong>Set your vantage point</strong></div>
+              <button id="closeLocation" class="bare-button" aria-label="Close location controls">×</button>
+            </div>
+            <label for="sitePreset">Observing site</label>
+            <select id="sitePreset">
+              <option value="40.7128,-74.0060,New York City">New York City, USA</option>
+              <option value="51.5074,-0.1278,London">London, UK</option>
+              <option value="19.8206,-155.4681,Mauna Kea">Mauna Kea, Hawaiʻi</option>
+              <option value="-24.6272,-70.4042,Paranal Observatory">Paranal Observatory, Chile</option>
+              <option value="-33.8688,151.2093,Sydney">Sydney, Australia</option>
+              <option value="35.6762,139.6503,Tokyo">Tokyo, Japan</option>
+              <option value="custom">Custom coordinates</option>
+            </select>
+            <div class="coordinate-grid">
+              <label>Latitude <input id="latitudeInput" type="number" min="-90" max="90" step="0.0001" value="40.7128" /></label>
+              <label>Longitude <input id="longitudeInput" type="number" min="-180" max="180" step="0.0001" value="-74.0060" /></label>
+            </div>
+            <button id="useLocation" class="primary-button"><span aria-hidden="true">◎</span> Use my current location</button>
+            <p id="locationMessage" class="field-note">Coordinates use decimal degrees; west longitudes are negative.</p>
+          </section>
+
+          <section id="aboutPanel" class="floating-panel about-panel" hidden>
+            <div class="panel-heading">
+              <div><span class="panel-kicker">About this atlas</span><strong>Real sky, open data</strong></div>
+              <button id="closeAbout" class="bare-button" aria-label="Close about panel">×</button>
+            </div>
+            <p>The sky dome is computed locally from your chosen place and UTC time. At narrow fields, the view blends into real telescope survey imagery.</p>
+            <ul>
+              <li><a href="https://alasky.cds.unistra.fr/hips-image-services/hips2fits" target="_blank" rel="noreferrer">CDS HiPS2FITS</a> — survey delivery</li>
+              <li>DSS2, Pan-STARRS DR1, and 2MASS — sky imagery</li>
+              <li>Yale Bright Star Catalog, SIMBAD, and OpenNGC — curated object data</li>
+              <li>NASA, ESA, ESO, and Wikimedia Commons — credited object photography</li>
+            </ul>
+            <p class="field-note">Survey and object-image licenses belong to their source archives. Atlas code is MIT licensed.</p>
+          </section>
+
+          <section class="time-console" aria-label="Time controls">
+            <button id="timeBack" class="transport-button" aria-label="Step backward in time" title="Step backward">‹</button>
+            <button id="playToggle" class="play-button" aria-label="Pause time"><span id="playIcon">Ⅱ</span></button>
+            <button id="timeForward" class="transport-button" aria-label="Step forward in time" title="Step forward">›</button>
+            <div class="time-display">
+              <label for="dateTimeInput">Observer time · UTC</label>
+              <input id="dateTimeInput" type="datetime-local" step="60" />
+              <span id="localTimeLabel">— local</span>
+            </div>
+            <div class="speed-control">
+              <label for="speedSelect">TIME RATE</label>
+              <select id="speedSelect">
+                <option value="-31557600">−1 year / sec</option>
+                <option value="-86400">−1 day / sec</option>
+                <option value="-3600">−1 hour / sec</option>
+                <option value="-60">−1 min / sec</option>
+                <option value="1" selected>Real time</option>
+                <option value="60">+1 min / sec</option>
+                <option value="3600">+1 hour / sec</option>
+                <option value="86400">+1 day / sec</option>
+                <option value="31557600">+1 year / sec</option>
+              </select>
+            </div>
+            <button id="nowButton" class="now-button">Now</button>
+          </section>
+
+          <div class="hint-bar"><span>Drag to explore</span><span>Scroll to zoom</span><span>Click an object for details</span></div>
+        </section>
+
+        <aside id="inspector" class="inspector" aria-live="polite">
+          <button id="closeInspector" class="mobile-close" aria-label="Close details drawer">×</button>
+          <div id="emptyInspector" class="empty-inspector">
+            <div class="orbit-glyph" aria-hidden="true"><span></span><i></i></div>
+            <span class="panel-kicker">Field guide</span>
+            <h1>The universe is overhead.</h1>
+            <p>Select any labeled star, planet, galaxy, nebula, or cluster to inspect it here.</p>
+            <div id="tonightList" class="tonight-list"></div>
+          </div>
+
+          <article id="objectInspector" class="object-inspector" hidden>
+            <div id="objectHero" class="object-hero" hidden>
+              <img id="objectImage" alt="" />
+              <div class="hero-vignette"></div>
+              <a id="imageCredit" class="image-credit" target="_blank" rel="noreferrer"></a>
+            </div>
+            <div class="object-content">
+              <div class="object-heading">
+                <div><span id="objectType" class="panel-kicker"></span><h1 id="objectName"></h1><p id="objectAliases" class="aliases"></p></div>
+                <button id="focusObject" class="focus-button" title="Center this object"><span aria-hidden="true">⊕</span> Center</button>
+              </div>
+              <p id="objectSummary" class="object-summary"></p>
+              <div class="fact-grid">
+                <div><span>Distance from Earth</span><strong id="objectDistance"></strong></div>
+                <div><span>Mass</span><strong id="objectMass"></strong></div>
+                <div class="wide"><span>Composition</span><strong id="objectComposition"></strong></div>
+              </div>
+              <div class="coordinates-card">
+                <div><span>Right ascension</span><strong id="objectRa"></strong></div>
+                <div><span>Declination</span><strong id="objectDec"></strong></div>
+                <div><span>Altitude now</span><strong id="objectAlt"></strong></div>
+                <div><span>Azimuth now</span><strong id="objectAz"></strong></div>
+              </div>
+              <div class="visibility-card"><span id="visibilityIcon">◒</span><div><strong id="visibilityTitle"></strong><p id="visibilityText"></p></div></div>
+              <div class="data-note">Catalog coordinates are J2000. Planet positions and distances are approximate. Follow the image credit above for the original file and license.</div>
+            </div>
+          </article>
+        </aside>
+      </main>
+    </div>
+    <noscript>Night Sky Atlas requires JavaScript to calculate and render the sky.</noscript>
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>
