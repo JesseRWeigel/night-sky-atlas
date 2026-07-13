@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#010204" />
+    <meta name="description" content="Step inside the time-aware Night Sky Atlas planetarium with WebXR on Meta Quest." />
+    <title>Night Sky Atlas VR</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="vr.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="vrCanvas" aria-label="Interactive three-dimensional planetarium"></canvas>
+
+    <header class="vr-topbar">
+      <a class="back-link" href="index.html"><span aria-hidden="true">←</span> Desktop atlas</a>
+      <div class="vr-brand"><span class="vr-brand-mark">◉</span><span><strong>Night Sky</strong><small>IMMERSIVE</small></span></div>
+      <div id="xrSupport" class="xr-status"><i></i><span>Checking headset…</span></div>
+    </header>
+
+    <main class="vr-ui">
+      <section id="vrWelcome" class="vr-welcome">
+        <span class="eyebrow">WEBXR PLANETARIUM</span>
+        <h1>Stand beneath<br />the real sky.</h1>
+        <p>Every star is placed for your saved location and the current time. Look around naturally, then point and select an object to inspect it.</p>
+        <div id="enterVrSlot" class="enter-vr-slot"></div>
+        <button id="previewButton" class="preview-button">Explore in 3D preview</button>
+        <p id="vrHelp" class="vr-help">On a Meta Quest, open this page in Quest Browser over HTTPS, then choose Enter VR.</p>
+      </section>
+
+      <section id="vrObjectPanel" class="vr-object-panel" hidden>
+        <button id="closeVrObject" aria-label="Close object details">×</button>
+        <span id="vrObjectType" class="eyebrow"></span>
+        <h2 id="vrObjectName"></h2>
+        <p id="vrObjectSummary"></p>
+        <dl>
+          <div><dt>Distance</dt><dd id="vrObjectDistance"></dd></div>
+          <div><dt>Mass</dt><dd id="vrObjectMass"></dd></div>
+          <div class="wide"><dt>Composition</dt><dd id="vrObjectComposition"></dd></div>
+        </dl>
+      </section>
+    </main>
+
+    <section class="vr-time-dock" aria-label="VR sky time controls">
+      <button id="vrTimeBack" aria-label="Move one hour backward">‹</button>
+      <button id="vrPlay" class="primary" aria-label="Pause time">Ⅱ</button>
+      <button id="vrTimeForward" aria-label="Move one hour forward">›</button>
+      <div class="vr-time-readout"><span>SKY TIME · UTC</span><strong id="vrDateTime">—</strong></div>
+      <div class="vr-place"><span>OBSERVER</span><strong id="vrLocation">New York City</strong></div>
+      <button id="vrNow">Now</button>
+    </section>
+
+    <div class="drag-hint">Drag to look · Scroll to zoom · Click an object</div>
+
+    <noscript>Night Sky Atlas VR requires JavaScript and WebGL.</noscript>
+    <script type="module" src="src/vr.js"></script>
+  </body>
+</html>

@@ -34,6 +34,7 @@ button, input, select { font: inherit; }
 button, select { color: inherit; }
 button { cursor: pointer; }
 a { color: #91d7ff; }
+.chip-button { text-decoration: none; }
 
 .sr-only {
   position: absolute;
@@ -648,6 +649,9 @@ a { color: #91d7ff; }
   .header-actions .chip-button,
   .header-actions .icon-button { width: 44px; min-height: 44px; padding: 0; justify-content: center; border-radius: 14px; }
   .header-actions .tonight-button { display: none; }
+  .header-actions #aboutToggle { display: none; }
+  .header-actions .vr-mode-link { width: 44px; }
+  .header-actions .vr-mode-link > span:last-child { display: none; }
   #locationToggle .status-dot { display: none; }
   #locationToggle::before { content: "◎"; color: #71d8d2; font-size: 17px; text-shadow: 0 0 10px rgba(93, 230, 221, .5); }
   #locationName, .header-actions .chip-button > span:last-child { display: none; }
@@ -750,6 +754,8 @@ body { background: #010204; }
 #locationName { color: #fff; }
 .status-dot { width: 7px; height: 7px; background: #61f2da; box-shadow: 0 0 11px rgba(97, 242, 218, .9); }
 .tonight-spark { color: #8bd9ff; }
+.vr-mode-link { color: #fff; }
+.vr-headset { color: #91e0ff; text-shadow: 0 0 12px rgba(103,201,255,.65); }
 
 .view-readout > div,
 .view-readout .condition,
