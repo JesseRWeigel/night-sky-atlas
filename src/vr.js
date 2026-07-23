@@ -7,6 +7,8 @@ const $ = (selector) => document.querySelector(selector);
 const canvas = $("#vrCanvas");
 const OBSERVER_HEIGHT = 1.6;
 const SKY_RADIUS = 88;
+const MIN_MAGNIFICATION = 1;
+const MAX_MAGNIFICATION = 4;
 const TAU = Math.PI * 2;
 
 const state = {
@@ -22,6 +24,8 @@ const state = {
   moved: false,
   yaw: Math.PI,
   pitch: .32,
+  magnification: 1,
+  controlsPlacementFrames: 0,
 };
 
 try {
@@ -45,19 +49,29 @@ renderer.xr.setReferenceSpaceType("local-floor");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x01030a);
 
+// Celestial positions are stored relative to the viewer. In desktop preview
+// this group sits at the nominal eye height; in XR it is aligned to the first
+// tracked headset pose so the horizon cannot drift above or below the viewer.
+const skyGroup = new THREE.Group();
+skyGroup.position.set(0, OBSERVER_HEIGHT, 0);
+scene.add(skyGroup);
+
 const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.03, 260);
 camera.position.set(0, OBSERVER_HEIGHT, 0);
 camera.rotation.order = "YXZ";
 camera.rotation.set(state.pitch, state.yaw, 0);
 scene.add(camera);
 
-const observer = new THREE.Vector3(0, OBSERVER_HEIGHT, 0);
 const raycaster = new THREE.Raycaster();
 raycaster.far = SKY_RADIUS + 10;
 const pointer = new THREE.Vector2();
 const selectables = [];
 const markerRecords = [];
 const constellationRecords = [];
+const controllerRecords = [];
+const inputStates = new WeakMap();
+const viewerPosition = new THREE.Vector3();
+const viewerDirection = new THREE.Vector3();
 
 function seededRandom(seed = 0x51a7f00d) {
   let value = seed >>> 0;
@@ -74,7 +88,7 @@ function horizontalPosition(ra, dec, radius = SKY_RADIUS) {
   const horizontalRadius = Math.cos(altitude) * radius;
   return new THREE.Vector3(
     Math.sin(azimuth) * horizontalRadius,
-    OBSERVER_HEIGHT + Math.sin(altitude) * radius,
+    Math.sin(altitude) * radius,
     -Math.cos(azimuth) * horizontalRadius,
   );
 }
@@ -123,21 +137,22 @@ function createDeepSkyTexture() {
 
 function createLabelTexture(text, color = "#dcecff") {
   const labelCanvas = document.createElement("canvas");
-  labelCanvas.width = 512;
-  labelCanvas.height = 128;
+  labelCanvas.width = 1024;
+  labelCanvas.height = 256;
   const context = labelCanvas.getContext("2d");
-  context.font = "600 42px system-ui, sans-serif";
+  context.font = "700 92px system-ui, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.shadowColor = "rgba(0,0,0,.95)";
-  context.shadowBlur = 12;
-  context.lineWidth = 8;
+  context.shadowBlur = 24;
+  context.lineWidth = 18;
   context.strokeStyle = "rgba(0,0,0,.88)";
-  context.strokeText(text, 256, 64);
+  context.strokeText(text, 512, 128);
   context.fillStyle = color;
-  context.fillText(text, 256, 64);
+  context.fillText(text, 512, 128);
   const texture = new THREE.CanvasTexture(labelCanvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return texture;
 }
 
@@ -175,23 +190,32 @@ const backgroundPoints = new THREE.Points(
   backgroundGeometry,
   new THREE.PointsMaterial({ size: .2, vertexColors: true, transparent: true, opacity: .94, sizeAttenuation: true, depthWrite: false }),
 );
-scene.add(backgroundPoints);
+skyGroup.add(backgroundPoints);
 
 function addMarker(object, texture, scale, showLabel = false) {
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   const sprite = new THREE.Sprite(material);
   sprite.scale.set(scale, scale, 1);
   sprite.userData.skyObject = object;
-  scene.add(sprite);
-  selectables.push(sprite);
+  skyGroup.add(sprite);
+
+  // The visible points are intentionally small, but selecting a sub-degree
+  // target with a hand-held controller is frustrating. This invisible sprite
+  // gives each object a roughly four-degree hit area without changing its look.
+  const hitTarget = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+  hitTarget.scale.set(6, 6, 1);
+  hitTarget.userData.skyObject = object;
+  hitTarget.userData.marker = sprite;
+  skyGroup.add(hitTarget);
+  selectables.push(hitTarget);
 
   let label = null;
   if (showLabel) {
-    label = new THREE.Sprite(new THREE.SpriteMaterial({ map: createLabelTexture(object.name), transparent: true, depthWrite: false }));
-    label.scale.set(4.8, 1.2, 1);
-    scene.add(label);
+    label = new THREE.Sprite(new THREE.SpriteMaterial({ map: createLabelTexture(object.name), transparent: true, depthWrite: false, toneMapped: false }));
+    label.scale.set(9.6, 2.4, 1);
+    skyGroup.add(label);
   }
-  markerRecords.push({ sprite, label, object });
+  markerRecords.push({ sprite, label, hitTarget, object, markerScale: scale });
 }
 
 for (const star of STARS) {
@@ -217,7 +241,7 @@ for (const constellation of CONSTELLATION_LINES) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(stars.length * 3), 3));
   const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x3b789c, transparent: true, opacity: .35, depthWrite: false }));
-  scene.add(line);
+  skyGroup.add(line);
   constellationRecords.push({ line, stars });
 }
 
@@ -227,10 +251,10 @@ function createHorizontalRing(altitude, opacity) {
     const azimuth = index / 160 * TAU;
     const alt = altitude * Math.PI / 180;
     const radius = Math.cos(alt) * SKY_RADIUS;
-    points.push(new THREE.Vector3(Math.sin(azimuth) * radius, OBSERVER_HEIGHT + Math.sin(alt) * SKY_RADIUS, -Math.cos(azimuth) * radius));
+    points.push(new THREE.Vector3(Math.sin(azimuth) * radius, Math.sin(alt) * SKY_RADIUS, -Math.cos(azimuth) * radius));
   }
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  scene.add(new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ color: 0x5b9ac0, transparent: true, opacity, depthWrite: false })));
+  skyGroup.add(new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ color: 0x5b9ac0, transparent: true, opacity, depthWrite: false })));
 }
 
 createHorizontalRing(0, .55);
@@ -239,10 +263,10 @@ createHorizontalRing(60, .13);
 
 for (const [name, azimuth] of [["N", 0], ["E", 90], ["S", 180], ["W", 270]]) {
   const radians = azimuth * Math.PI / 180;
-  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: createLabelTexture(name, "#80cdec"), transparent: true, depthWrite: false }));
-  label.scale.set(2.3, .7, 1);
-  label.position.set(Math.sin(radians) * 72, OBSERVER_HEIGHT + 1.1, -Math.cos(radians) * 72);
-  scene.add(label);
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: createLabelTexture(name, "#80cdec"), transparent: true, depthWrite: false, toneMapped: false }));
+  label.scale.set(4.6, 1.4, 1);
+  label.position.set(Math.sin(radians) * 72, 1.1, -Math.cos(radians) * 72);
+  skyGroup.add(label);
 }
 
 const ground = new THREE.Mesh(
@@ -250,7 +274,9 @@ const ground = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: 0x010205, side: THREE.DoubleSide }),
 );
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = OBSERVER_HEIGHT - .08;
+// local-floor defines y=0 as the physical floor. The previous near-eye-level
+// plane made the celestial hemisphere read as though it were beneath the user.
+ground.position.y = 0;
 scene.add(ground);
 
 const infoCanvas = document.createElement("canvas");
@@ -258,13 +284,86 @@ infoCanvas.width = 1024;
 infoCanvas.height = 600;
 const infoTexture = new THREE.CanvasTexture(infoCanvas);
 infoTexture.colorSpace = THREE.SRGBColorSpace;
+infoTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 const infoPanel = new THREE.Mesh(
-  new THREE.PlaneGeometry(3.4, 2),
-  new THREE.MeshBasicMaterial({ map: infoTexture, transparent: true, side: THREE.DoubleSide, depthTest: false }),
+  new THREE.PlaneGeometry(2.9, 1.7),
+  new THREE.MeshBasicMaterial({ map: infoTexture, transparent: true, side: THREE.DoubleSide, depthTest: false, toneMapped: false }),
 );
 infoPanel.renderOrder = 100;
 infoPanel.visible = false;
 scene.add(infoPanel);
+
+const controlsCanvas = document.createElement("canvas");
+controlsCanvas.width = 1024;
+controlsCanvas.height = 600;
+const controlsTexture = new THREE.CanvasTexture(controlsCanvas);
+controlsTexture.colorSpace = THREE.SRGBColorSpace;
+controlsTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const controlsPanel = new THREE.Mesh(
+  new THREE.PlaneGeometry(3.05, 1.78),
+  new THREE.MeshBasicMaterial({ map: controlsTexture, transparent: true, side: THREE.DoubleSide, depthTest: false, toneMapped: false }),
+);
+controlsPanel.renderOrder = 101;
+controlsPanel.visible = false;
+scene.add(controlsPanel);
+
+function activeViewerCamera() {
+  return renderer.xr.isPresenting ? renderer.xr.getCamera(camera) : camera;
+}
+
+function placePanelInFront(panel, distance = 2.15, verticalOffset = -.12) {
+  const viewer = activeViewerCamera();
+  viewer.getWorldPosition(viewerPosition);
+  viewer.getWorldDirection(viewerDirection).normalize();
+  panel.position.copy(viewerPosition).addScaledVector(viewerDirection, distance);
+  panel.position.y += verticalOffset;
+  panel.lookAt(viewerPosition);
+}
+
+function alignSkyToViewer() {
+  activeViewerCamera().getWorldPosition(viewerPosition);
+  skyGroup.position.copy(viewerPosition);
+  skyGroup.updateMatrixWorld(true);
+}
+
+function drawControlsPanel() {
+  const context = controlsCanvas.getContext("2d");
+  context.clearRect(0, 0, controlsCanvas.width, controlsCanvas.height);
+  context.fillStyle = "rgba(5,8,14,.97)";
+  context.strokeStyle = "rgba(119,210,255,.82)";
+  context.lineWidth = 5;
+  context.beginPath();
+  context.roundRect(5, 5, 1014, 590, 38);
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = "#79d6ff";
+  context.font = "700 26px system-ui, sans-serif";
+  context.fillText("QUEST CONTROLS", 60, 72);
+  context.fillStyle = "#ffffff";
+  context.font = "700 56px system-ui, sans-serif";
+  context.fillText("Explore the sky", 60, 145);
+
+  const rows = [
+    ["TRIGGER", "Point the blue beam and select"],
+    ["THUMBSTICK  ↑ ↓", `Zoom labels and objects  ·  ${state.magnification.toFixed(1)}×`],
+    ["A / X", "Show or hide this controls card"],
+    ["B / Y", "Close object details"],
+  ];
+  rows.forEach(([control, action], index) => {
+    const y = 230 + index * 76;
+    context.fillStyle = "#7e96aa";
+    context.font = "700 22px system-ui, sans-serif";
+    context.fillText(control, 60, y);
+    context.fillStyle = "#eaf2f7";
+    context.font = "30px system-ui, sans-serif";
+    context.fillText(action, 345, y);
+  });
+  context.fillStyle = "#8298aa";
+  context.font = "23px system-ui, sans-serif";
+  context.fillText("The horizon ring is at eye level; look upward for the visible sky.", 60, 552);
+  controlsTexture.needsUpdate = true;
+}
 
 function drawWrappedText(context, text, x, y, maxWidth, lineHeight, maxLines = 3) {
   const words = String(text || "").split(/\s+/);
@@ -284,7 +383,7 @@ function drawWrappedText(context, text, x, y, maxWidth, lineHeight, maxLines = 3
   if (lines < maxLines) context.fillText(line.trim(), x, y + lines * lineHeight);
 }
 
-function updateInfoPanel(object, marker) {
+function updateInfoPanel(object) {
   const context = infoCanvas.getContext("2d");
   context.clearRect(0, 0, infoCanvas.width, infoCanvas.height);
   context.fillStyle = "rgba(5,8,14,.96)";
@@ -313,17 +412,13 @@ function updateInfoPanel(object, marker) {
   drawWrappedText(context, object.mass || "Not precisely known", 524, 424, 420, 35, 2);
   context.fillStyle = "#7890a3";
   context.font = "22px system-ui, sans-serif";
-  context.fillText("Point at another object and press trigger to continue", 58, 548);
+  context.fillText("Trigger: select another  ·  Thumbstick: zoom  ·  B/Y: close", 58, 548);
   infoTexture.needsUpdate = true;
-
-  const direction = marker.position.clone().sub(observer).normalize();
-  infoPanel.position.copy(observer).add(direction.multiplyScalar(4.2));
-  infoPanel.position.y -= .35;
-  infoPanel.lookAt(observer);
+  placePanelInFront(infoPanel);
   infoPanel.visible = true;
 }
 
-function selectObject(object, marker) {
+function selectObject(object) {
   state.selected = object;
   $("#vrObjectPanel").hidden = false;
   $("#vrObjectType").textContent = object.type || "Celestial object";
@@ -332,7 +427,7 @@ function selectObject(object, marker) {
   $("#vrObjectDistance").textContent = object.distance || "Not known";
   $("#vrObjectMass").textContent = object.mass || "Not precisely known";
   $("#vrObjectComposition").textContent = object.composition || "Not precisely known";
-  updateInfoPanel(object, marker);
+  updateInfoPanel(object);
 }
 
 function updateSky(force = false) {
@@ -357,6 +452,7 @@ function updateSky(force = false) {
     }
     const position = horizontalPosition(record.object.ra, record.object.dec);
     record.sprite.position.copy(position);
+    record.hitTarget.position.copy(position);
     if (record.label) {
       record.label.position.copy(position).multiplyScalar(.985);
       record.label.position.y += .8;
@@ -373,12 +469,98 @@ function updateSky(force = false) {
   $("#vrLocation").textContent = state.locationName;
 }
 
-function raycastFromController(controller) {
+function applyMagnification() {
+  const scale = Math.sqrt(state.magnification);
+  for (const record of markerRecords) {
+    record.sprite.scale.setScalar(record.markerScale * scale);
+    record.sprite.scale.z = 1;
+    record.hitTarget.scale.set(6, 6, 1);
+    if (record.label) record.label.scale.set(9.6 * scale, 2.4 * scale, 1);
+  }
+}
+
+let displayedMagnification = state.magnification.toFixed(1);
+function setMagnification(value) {
+  state.magnification = THREE.MathUtils.clamp(value, MIN_MAGNIFICATION, MAX_MAGNIFICATION);
+  applyMagnification();
+  const displayValue = state.magnification.toFixed(1);
+  if (displayValue !== displayedMagnification) {
+    displayedMagnification = displayValue;
+    if (controlsPanel.visible) drawControlsPanel();
+  }
+}
+
+function hitFromController(controller) {
   const rotation = new THREE.Matrix4().extractRotation(controller.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation).normalize();
-  const hit = raycaster.intersectObjects(selectables, false)[0];
-  if (hit) selectObject(hit.object.userData.skyObject, hit.object);
+  return raycaster.intersectObjects(selectables, false)[0] || null;
+}
+
+function pulseController(inputSource) {
+  const actuator = inputSource?.gamepad?.hapticActuators?.[0];
+  if (actuator?.pulse) actuator.pulse(.45, 45).catch(() => {});
+}
+
+function raycastFromController(controller, event) {
+  if (controlsPanel.visible) {
+    controlsPanel.visible = false;
+  }
+  const hit = hitFromController(controller);
+  if (!hit) return;
+  selectObject(hit.object.userData.skyObject);
+  pulseController(event?.data);
+}
+
+function updateControllerPointers() {
+  for (const record of controllerRecords) {
+    const hit = hitFromController(record.controller);
+    record.ray.scale.z = hit ? hit.distance : SKY_RADIUS;
+    record.ray.material.color.setHex(hit ? 0x61f2da : 0x80dfff);
+    record.ray.material.opacity = hit ? 1 : .55;
+    record.cursor.visible = Boolean(hit);
+    if (hit) {
+      record.cursor.position.z = -hit.distance;
+      record.cursor.scale.setScalar(Math.max(1, hit.distance * .1));
+    }
+  }
+}
+
+function closeSelection() {
+  $("#vrObjectPanel").hidden = true;
+  infoPanel.visible = false;
+  state.selected = null;
+}
+
+function thumbstickY(gamepad) {
+  if (!gamepad?.axes?.length) return 0;
+  return gamepad.axes.length >= 4 ? gamepad.axes[3] : gamepad.axes[gamepad.axes.length - 1];
+}
+
+function updateXrControls(elapsed) {
+  const session = renderer.xr.getSession();
+  if (!session) return;
+  for (const inputSource of session.inputSources) {
+    const gamepad = inputSource.gamepad;
+    if (!gamepad) continue;
+    const previous = inputStates.get(inputSource) || { help: false, close: false };
+    const help = Boolean(gamepad.buttons[4]?.pressed);
+    const close = Boolean(gamepad.buttons[5]?.pressed);
+    if (help && !previous.help) {
+      controlsPanel.visible = !controlsPanel.visible;
+      if (controlsPanel.visible) {
+        drawControlsPanel();
+        placePanelInFront(controlsPanel, 2.25, -.1);
+      }
+    }
+    if (close && !previous.close) closeSelection();
+    inputStates.set(inputSource, { help, close });
+
+    const axis = thumbstickY(gamepad);
+    if (Math.abs(axis) > .18) {
+      setMagnification(state.magnification * Math.exp(-axis * elapsed * 1.15));
+    }
+  }
 }
 
 const rayGeometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
@@ -387,9 +569,16 @@ for (let index = 0; index < 2; index += 1) {
   const ray = new THREE.Line(rayGeometry, new THREE.LineBasicMaterial({ color: 0x80dfff, transparent: true, opacity: .72 }));
   ray.scale.z = SKY_RADIUS;
   controller.add(ray);
-  controller.addEventListener("selectstart", () => raycastFromController(controller));
+  const cursor = new THREE.Mesh(
+    new THREE.RingGeometry(.025, .042, 32),
+    new THREE.MeshBasicMaterial({ color: 0x61f2da, transparent: true, opacity: .95, side: THREE.DoubleSide, depthTest: false }),
+  );
+  cursor.visible = false;
+  controller.add(cursor);
+  controller.addEventListener("selectstart", (event) => raycastFromController(controller, event));
   scene.add(controller);
   scene.add(renderer.xr.getHand(index));
+  controllerRecords.push({ controller, ray, cursor });
 }
 
 const vrButton = VRButton.createButton(renderer, { optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"] });
@@ -409,23 +598,29 @@ async function updateXrSupport() {
 }
 
 renderer.xr.addEventListener("sessionstart", () => {
+  // local-floor supplies the headset pose; the dome is aligned to that tracked
+  // position during the first frames below.
+  camera.position.set(0, 0, 0);
   camera.rotation.set(0, 0, 0);
+  state.controlsPlacementFrames = 3;
+  drawControlsPanel();
+  controlsPanel.visible = true;
   $("#vrWelcome").hidden = true;
   $(".vr-time-dock").hidden = true;
   $(".drag-hint").hidden = true;
 });
 renderer.xr.addEventListener("sessionend", () => {
+  camera.position.set(0, OBSERVER_HEIGHT, 0);
   camera.rotation.set(state.pitch, state.yaw, 0);
+  skyGroup.position.set(0, OBSERVER_HEIGHT, 0);
+  controlsPanel.visible = false;
+  infoPanel.visible = false;
   $(".vr-time-dock").hidden = false;
   $(".drag-hint").hidden = false;
 });
 
 $("#previewButton").addEventListener("click", () => { $("#vrWelcome").hidden = true; });
-$("#closeVrObject").addEventListener("click", () => {
-  $("#vrObjectPanel").hidden = true;
-  infoPanel.visible = false;
-  state.selected = null;
-});
+$("#closeVrObject").addEventListener("click", closeSelection);
 $("#vrTimeBack").addEventListener("click", () => { state.date = new Date(state.date.getTime() - 3600000); updateSky(true); });
 $("#vrTimeForward").addEventListener("click", () => { state.date = new Date(state.date.getTime() + 3600000); updateSky(true); });
 $("#vrPlay").addEventListener("click", () => {
@@ -455,7 +650,7 @@ canvas.addEventListener("pointerup", (event) => {
     pointer.y = -(event.clientY / window.innerHeight * 2 - 1);
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObjects(selectables, false)[0];
-    if (hit) selectObject(hit.object.userData.skyObject, hit.object);
+    if (hit) selectObject(hit.object.userData.skyObject);
   }
   state.dragging = null;
 });
@@ -478,8 +673,20 @@ renderer.setAnimationLoop((now) => {
   lastFrame = now;
   if (state.playing) state.date = new Date(state.date.getTime() + elapsed * state.timeRate * 1000);
   updateSky();
+  if (renderer.xr.isPresenting) {
+    // The XR camera pose becomes available after the session's first frame.
+    // Align the dome and help card to the actual tracked viewer.
+    if (state.controlsPlacementFrames > 0) {
+      alignSkyToViewer();
+      if (controlsPanel.visible) placePanelInFront(controlsPanel, 2.25, -.1);
+      state.controlsPlacementFrames -= 1;
+    }
+    updateXrControls(elapsed);
+    updateControllerPointers();
+  }
   renderer.render(scene, camera);
 });
 
 updateSky(true);
+applyMagnification();
 updateXrSupport();

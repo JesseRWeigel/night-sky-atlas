@@ -58,8 +58,11 @@ the desktop atlas.
 1. Open the [published site](https://jesserweigel.github.io/night-sky-atlas/)
    in Meta Quest Browser.
 2. Choose **VR mode**, then **Enter VR**.
-3. Look around naturally. Point either controller at a star, planet, galaxy,
-   nebula, or cluster and press the trigger to open its in-headset fact panel.
+3. Look upward from the eye-level horizon ring. Point either controller's blue
+   beam at a star, planet, galaxy, nebula, or cluster. The reticle turns green
+   when it locks on; press the trigger to open a fact panel in front of you.
+4. Push either thumbstick up or down to magnify labels and objects. Press A or X
+   to show the in-headset controls card again, and B or Y to close details.
 
 The saved observer location carries into VR. The VR page also includes time
 controls before entering the headset session. On a desktop without WebXR, use
