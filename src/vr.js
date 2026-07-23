@@ -26,6 +26,7 @@ const state = {
   pitch: .32,
   magnification: 1,
   controlsPlacementFrames: 0,
+  xrInteractionFailed: false,
 };
 
 try {
@@ -333,7 +334,8 @@ function drawControlsPanel() {
   context.strokeStyle = "rgba(119,210,255,.82)";
   context.lineWidth = 5;
   context.beginPath();
-  context.roundRect(5, 5, 1014, 590, 38);
+  if (context.roundRect) context.roundRect(5, 5, 1014, 590, 38);
+  else context.rect(5, 5, 1014, 590);
   context.fill();
   context.stroke();
 
@@ -390,7 +392,8 @@ function updateInfoPanel(object) {
   context.strokeStyle = "rgba(119,210,255,.72)";
   context.lineWidth = 4;
   context.beginPath();
-  context.roundRect(4, 4, 1016, 592, 36);
+  if (context.roundRect) context.roundRect(4, 4, 1016, 592, 36);
+  else context.rect(4, 4, 1016, 592);
   context.fill();
   context.stroke();
   context.fillStyle = "#76cdec";
@@ -494,6 +497,11 @@ function hitFromController(controller) {
   const rotation = new THREE.Matrix4().extractRotation(controller.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation).normalize();
+  // Sprite.raycast() requires a camera so it can construct the billboard in
+  // world space. setFromCamera() supplies this automatically for mouse input;
+  // controller rays are assembled manually, so use the current XR eye camera.
+  const viewer = activeViewerCamera();
+  raycaster.camera = viewer.isArrayCamera ? viewer.cameras[0] || camera : viewer;
   return raycaster.intersectObjects(selectables, false)[0] || null;
 }
 
@@ -514,6 +522,7 @@ function raycastFromController(controller, event) {
 
 function updateControllerPointers() {
   for (const record of controllerRecords) {
+    if (!record.controller.visible) continue;
     const hit = hitFromController(record.controller);
     record.ray.scale.z = hit ? hit.distance : SKY_RADIUS;
     record.ray.material.color.setHex(hit ? 0x61f2da : 0x80dfff);
@@ -603,6 +612,7 @@ renderer.xr.addEventListener("sessionstart", () => {
   camera.position.set(0, 0, 0);
   camera.rotation.set(0, 0, 0);
   state.controlsPlacementFrames = 3;
+  state.xrInteractionFailed = false;
   drawControlsPanel();
   controlsPanel.visible = true;
   $("#vrWelcome").hidden = true;
@@ -674,15 +684,24 @@ renderer.setAnimationLoop((now) => {
   if (state.playing) state.date = new Date(state.date.getTime() + elapsed * state.timeRate * 1000);
   updateSky();
   if (renderer.xr.isPresenting) {
-    // The XR camera pose becomes available after the session's first frame.
-    // Align the dome and help card to the actual tracked viewer.
-    if (state.controlsPlacementFrames > 0) {
-      alignSkyToViewer();
-      if (controlsPanel.visible) placePanelInFront(controlsPanel, 2.25, -.1);
-      state.controlsPlacementFrames -= 1;
+    try {
+      // The XR camera pose becomes available after the session's first frame.
+      // Align the dome and help card to the actual tracked viewer.
+      if (state.controlsPlacementFrames > 0) {
+        alignSkyToViewer();
+        if (controlsPanel.visible) placePanelInFront(controlsPanel, 2.25, -.1);
+        state.controlsPlacementFrames -= 1;
+      }
+      if (!state.xrInteractionFailed) {
+        updateXrControls(elapsed);
+        updateControllerPointers();
+      }
+    } catch (error) {
+      // Interaction feedback must never prevent the first XR frame from being
+      // submitted; otherwise Quest remains on its loading indicator.
+      state.xrInteractionFailed = true;
+      console.error("Night Sky Atlas: disabling XR interaction helpers", error);
     }
-    updateXrControls(elapsed);
-    updateControllerPointers();
   }
   renderer.render(scene, camera);
 });
