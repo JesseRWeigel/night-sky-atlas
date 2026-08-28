@@ -98,6 +98,22 @@ test("tool handlers translate every snake_case input and serialize expected erro
   ]);
 });
 
+test("advance observing tour forwards a direction alternative to the action", async () => {
+  let received;
+  const tools = createWebMcpTools({
+    ...actions,
+    advanceTour(input) {
+      received = input;
+      return { moved: true };
+    },
+  });
+
+  const result = await tools.find((tool) => tool.name === "advance_observing_tour").execute({ direction: "next" });
+
+  assert.deepEqual(result, { ok: true, moved: true });
+  assert.deepEqual(received, { direction: "next" });
+});
+
 test("tool handlers serialize expected AppError failures", async () => {
   const tools = createWebMcpTools({
     ...actions,
