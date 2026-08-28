@@ -8,6 +8,7 @@
     <title>Night Sky Atlas — an open planetarium</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="plan.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -29,6 +30,11 @@
           <a id="vrModeLink" class="chip-button vr-mode-link" href="vr.html" title="Enter the immersive WebXR planetarium">
             <span class="vr-headset" aria-hidden="true">◉</span><span>VR mode</span>
           </a>
+          <button id="planToggle" class="chip-button plan-toggle" aria-expanded="false" aria-controls="planRail">
+            <span class="plan-route-icon" aria-hidden="true">⋯</span>
+            <span>Plan</span>
+            <strong id="planCount" aria-label="0 targets">0</strong>
+          </button>
           <button id="tonightToggle" class="chip-button tonight-button" aria-expanded="false" aria-controls="inspector">
             <span class="tonight-spark" aria-hidden="true">✦</span><span>Tonight</span>
           </button>
@@ -150,6 +156,15 @@
           <div class="hint-bar"><span>Drag to explore</span><span>Scroll to zoom</span><span>Click an object for details</span></div>
         </section>
 
+        <aside id="planRail" class="plan-rail" aria-labelledby="planRailTitle" aria-hidden="true">
+          <header class="plan-rail-header">
+            <div><span class="panel-kicker">Observing route</span><h2 id="planRailTitle" tabindex="-1">Your sky plan</h2></div>
+            <button id="closePlan" class="bare-button" aria-label="Close observing plan">×</button>
+          </header>
+          <div id="planContent" class="plan-content"></div>
+          <p id="planStatus" class="sr-only" aria-live="polite"></p>
+        </aside>
+
         <aside id="inspector" class="inspector" aria-live="polite">
           <button id="closeInspector" class="mobile-close" aria-label="Close details drawer">×</button>
           <div id="emptyInspector" class="empty-inspector">
@@ -170,6 +185,9 @@
               <div class="object-heading">
                 <div><span id="objectType" class="panel-kicker"></span><h1 id="objectName"></h1><p id="objectAliases" class="aliases"></p></div>
                 <button id="focusObject" class="focus-button" title="Center this object"><span aria-hidden="true">⊕</span> Center</button>
+                <button id="addObjectToPlan" class="focus-button" title="Add this object to the observing plan">
+                  <span aria-hidden="true">＋</span> Add to plan
+                </button>
               </div>
               <p id="objectSummary" class="object-summary"></p>
               <div class="fact-grid">
