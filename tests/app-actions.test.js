@@ -84,6 +84,22 @@ test("framing and layer actions update shared state and report the change", () =
   assert.equal(changes.at(-1).type, "layers-configured");
 });
 
+test("survey mode transitions preserve a framed target across coordinate systems", () => {
+  const { actions, state } = harness();
+  actions.frameTarget({ targetId: "star-vega", fieldOfView: 12 });
+  const framed = { ra: state.centerRa, dec: state.centerDec };
+
+  actions.configureLayers({ survey: "off" });
+
+  assert.ok(Math.abs(state.centerAz - 158.27) < 0.02);
+  assert.ok(Math.abs(state.centerAlt - 87.93) < 0.02);
+
+  actions.configureLayers({ survey: "auto" });
+
+  assert.ok(Math.abs(state.centerRa - framed.ra) < 0.001);
+  assert.ok(Math.abs(state.centerDec - framed.dec) < 0.001);
+});
+
 test("empty layer configuration is rejected without mutation", () => {
   const { actions, state } = harness();
   const snapshot = structuredClone(state);

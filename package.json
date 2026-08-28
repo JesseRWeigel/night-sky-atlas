@@ -6,7 +6,8 @@
   "description": "An interactive, time-aware planetarium and deep-sky image explorer.",
   "scripts": {
     "dev": "python3 -m http.server 4173",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "check": "node --check src/app-error.js && node --check src/astronomy.js && node --check src/catalog.js && node --check src/observing.js && node --check src/plan-store.js && node --check src/app-actions.js && node --check src/plan-ui.js && node --check src/webmcp.js && node --check src/app.js && node --check src/vr.js && npm test"
   },
   "license": "MIT"
 }

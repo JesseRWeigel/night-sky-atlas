@@ -1,5 +1,5 @@
 import { AppError } from "./app-error.js";
-import { clamp, equatorialToHorizontal } from "./astronomy.js";
+import { clamp, equatorialToHorizontal, horizontalToEquatorial } from "./astronomy.js";
 import {
   buildCatalogAt,
   findObservableTargets as findTargets,
@@ -224,6 +224,7 @@ export function createAppActions({
       throw invalidInput("configure at least one supported layer");
     }
     const nextLayers = { ...state.layers };
+    const wasSurveyMode = state.fov < 28 && state.survey !== "off";
     for (const name of layerNames) {
       if (!(name in input)) continue;
       if (typeof input[name] !== "boolean") throw invalidInput(`${name} must be a boolean`);
@@ -236,6 +237,16 @@ export function createAppActions({
     const priorLayers = { ...state.layers, survey: state.survey };
     state.layers = nextLayers;
     state.survey = survey;
+    const nowSurveyMode = state.fov < 28 && state.survey !== "off";
+    if (wasSurveyMode && !nowSurveyMode) {
+      const horizontal = equatorialToHorizontal(state.centerRa, state.centerDec, state.date, state.latitude, state.longitude);
+      state.centerAz = horizontal.az;
+      state.centerAlt = horizontal.alt;
+    } else if (!wasSurveyMode && nowSurveyMode) {
+      const equatorial = horizontalToEquatorial(state.centerAz, state.centerAlt, state.date, state.latitude, state.longitude);
+      state.centerRa = equatorial.ra;
+      state.centerDec = equatorial.dec;
+    }
     const layers = { ...state.layers, survey: state.survey };
     emit("layers-configured", "Sky layers configured", { layers, priorLayers });
     return { layers, priorLayers };

@@ -13,7 +13,12 @@ import {
   unprojectEquatorial,
   unprojectHorizontal,
 } from "./astronomy.js";
+import { AppError } from "./app-error.js";
+import { createAppActions } from "./app-actions.js";
 import { CATALOG, CONSTELLATION_LINES, DEEP_SKY, SOLAR_SYSTEM_INFO, STARS } from "./catalog.js";
+import { loadPlan } from "./plan-store.js";
+import { mountPlanUi } from "./plan-ui.js";
+import { setupWebMcp } from "./webmcp.js";
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $("#skyCanvas");
@@ -26,6 +31,7 @@ const surveySpinner = surveyBadge.querySelector(".spinner");
 const dateTimeInput = $("#dateTimeInput");
 const speedSelect = $("#speedSelect");
 const inspector = $("#inspector");
+let planUi = { render() {}, announce() {} };
 
 const state = {
   date: new Date(),
@@ -55,6 +61,10 @@ const state = {
   width: 0,
   height: 0,
   dpr: 1,
+  plan: null,
+  planPreview: null,
+  planPanelOpen: false,
+  tour: { active: false, currentIndex: -1 },
 };
 
 const SURVEY_THRESHOLD = 28;
@@ -657,22 +667,18 @@ function setFov(nextFov, anchorX = state.width / 2, anchorY = state.height / 2) 
 
 function focusObject(object, fov = null) {
   if (!object) return;
-  if (fov !== null) state.fov = clamp(fov, .05, 180);
-  else if (state.fov > 16) state.fov = object.type === "Star" || object.isSolarSystem ? 12 : 6;
-  if (state.fov < SURVEY_THRESHOLD && state.survey !== "off") {
-    state.centerRa = object.ra;
-    state.centerDec = object.dec;
-  } else {
-    const horizontal = equatorialToHorizontal(object.ra, object.dec, state.date, state.latitude, state.longitude);
-    state.centerAz = horizontal.az;
-    state.centerAlt = horizontal.alt;
-  }
-  scheduleSurvey();
+  actions.frameTarget({
+    targetId: object.id,
+    ...(fov === null ? {} : { fieldOfView: fov }),
+  });
 }
 
 function selectObject(object, shouldFocus = false) {
+  if (shouldFocus) {
+    focusObject(object);
+    return;
+  }
   state.selected = object;
-  if (shouldFocus) focusObject(object);
   showInspector(object);
   closeMenus();
   inspector.classList.add("open");
@@ -807,16 +813,11 @@ function updateTimeUi() {
 }
 
 function setLocation(latitude, longitude, name = "Custom location") {
-  state.latitude = clamp(Number(latitude), -90, 90);
-  state.longitude = clamp(Number(longitude), -180, 180);
-  state.locationName = name;
-  $("#latitudeInput").value = state.latitude.toFixed(4);
-  $("#longitudeInput").value = state.longitude.toFixed(4);
-  $("#locationName").textContent = name;
-  updateTimeUi();
-  try {
-    localStorage.setItem("night-sky-location", JSON.stringify({ latitude: state.latitude, longitude: state.longitude, name }));
-  } catch {}
+  return actions.setObserverLocation({
+    latitude: Number(latitude),
+    longitude: Number(longitude),
+    locationName: name,
+  });
 }
 
 function restoreLocation() {
@@ -825,6 +826,98 @@ function restoreLocation() {
     if (Number.isFinite(saved?.latitude) && Number.isFinite(saved?.longitude)) setLocation(saved.latitude, saved.longitude, saved.name || "Saved location");
   } catch {}
 }
+
+function syncLocationControls() {
+  $("#latitudeInput").value = state.latitude.toFixed(4);
+  $("#longitudeInput").value = state.longitude.toFixed(4);
+  $("#locationName").textContent = state.locationName;
+}
+
+function syncPlaybackControls() {
+  speedSelect.value = String(state.timeRate);
+  $("#playIcon").textContent = state.playing ? "Ⅱ" : "▶";
+  $("#playToggle").setAttribute("aria-label", state.playing ? "Pause time" : "Resume time");
+}
+
+function syncLayerControls() {
+  for (const [selector, key] of [["#starsLayer", "stars"], ["#objectsLayer", "objects"], ["#constellationsLayer", "constellations"], ["#gridLayer", "grid"], ["#labelsLayer", "labels"]]) {
+    $(selector).checked = state.layers[key];
+  }
+  $("#surveySelect").value = state.survey;
+}
+
+function updatePlanCount() {
+  const count = (state.planPreview || state.plan)?.targets?.length || 0;
+  $("#planCount").textContent = String(count);
+  $("#planCount").setAttribute("aria-label", `${count} ${count === 1 ? "target" : "targets"}`);
+}
+
+function setPlanPanelOpen(open) {
+  state.planPanelOpen = open;
+  $("#planRail").classList.toggle("open", open);
+  $("#planRail").setAttribute("aria-hidden", String(!open));
+  $("#planToggle").setAttribute("aria-expanded", String(open));
+}
+
+function onStateChanged(change) {
+  if (change.type === "observer-location" || change.type === "observer-time") {
+    state.lastCatalogUpdate = 0;
+  }
+  if (change.type === "observer-location") {
+    syncLocationControls();
+    updateTimeUi();
+  }
+  if (change.type === "observer-time" || change.type === "tour-advanced") {
+    updateTimeUi();
+    syncPlaybackControls();
+  }
+  if (change.type === "layers-configured") {
+    syncLayerControls();
+  }
+  const surveyChanged = change.type === "layers-configured" && change.layers.survey !== change.priorLayers.survey;
+  if (["observer-location", "observer-time", "target-framed"].includes(change.type) || surveyChanged || change.type === "tour-advanced") {
+    scheduleSurvey();
+  }
+  if ((change.type === "target-framed" || change.type === "tour-advanced") && state.selected) {
+    showInspector(state.selected);
+    closeMenus();
+    inspector.classList.add("open");
+    $("#tonightToggle").setAttribute("aria-expanded", "true");
+  }
+  if (change.type.startsWith("plan-") || change.type === "tour-advanced") {
+    planUi.render();
+    updatePlanCount();
+    setPlanPanelOpen(true);
+  }
+  planUi.announce(change.message);
+}
+
+const actions = createAppActions({
+  state,
+  storage: window.localStorage,
+  effects: { onStateChanged },
+  createId: (prefix) => `${prefix}-${typeof window.crypto?.randomUUID === "function" ? window.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`,
+});
+
+function runUiAction(callback) {
+  try {
+    return callback();
+  } catch (error) {
+    if (error instanceof AppError) {
+      planUi.announce(error.message);
+      return undefined;
+    }
+    console.error("Unexpected atlas UI action failure", error);
+    throw error;
+  }
+}
+
+const plannerActions = new Proxy(actions, {
+  get(target, property, receiver) {
+    const value = Reflect.get(target, property, receiver);
+    return typeof value === "function" ? (...args) => runUiAction(() => value(...args)) : value;
+  },
+});
 
 function renderSearch(query) {
   const container = $("#searchResults");
@@ -900,17 +993,10 @@ function bindControls() {
   });
 
   for (const [selector, key] of [["#starsLayer", "stars"], ["#objectsLayer", "objects"], ["#constellationsLayer", "constellations"], ["#gridLayer", "grid"], ["#labelsLayer", "labels"]]) {
-    $(selector).addEventListener("change", (event) => { state.layers[key] = event.target.checked; });
+    $(selector).addEventListener("change", (event) => runUiAction(() => actions.configureLayers({ [key]: event.target.checked })));
   }
   $("#surveySelect").addEventListener("change", (event) => {
-    const wasMode = isSurveyMode();
-    state.survey = event.target.value;
-    const nowMode = isSurveyMode();
-    if (!wasMode && nowMode) {
-      const center = horizontalToEquatorial(state.centerAz, state.centerAlt, state.date, state.latitude, state.longitude);
-      state.centerRa = center.ra; state.centerDec = center.dec;
-    }
-    scheduleSurvey();
+    runUiAction(() => actions.configureLayers({ survey: event.target.value }));
   });
 
   $("#sitePreset").addEventListener("change", (event) => {
@@ -944,7 +1030,12 @@ function bindControls() {
 
   dateTimeInput.addEventListener("change", () => {
     const date = new Date(`${dateTimeInput.value}Z`);
-    if (!Number.isNaN(date.getTime())) { state.date = date; state.lastCatalogUpdate = 0; updateTimeUi(); }
+    if (!Number.isNaN(date.getTime())) {
+      const wasPlaying = state.playing;
+      runUiAction(() => actions.setObserverTime({ isoTime: date.toISOString() }));
+      state.playing = wasPlaying;
+      syncPlaybackControls();
+    }
   });
   speedSelect.addEventListener("change", () => { state.timeRate = Number(speedSelect.value); state.playing = true; $("#playIcon").textContent = "Ⅱ"; });
   $("#playToggle").addEventListener("click", () => {
@@ -953,9 +1044,21 @@ function bindControls() {
     $("#playToggle").setAttribute("aria-label", state.playing ? "Pause time" : "Resume time");
   });
   const stepAmount = () => Math.max(3600, Math.min(Math.abs(state.timeRate), 31557600));
-  $("#timeBack").addEventListener("click", () => { state.date = new Date(state.date.getTime() - stepAmount() * 1000); state.lastCatalogUpdate = 0; updateTimeUi(); });
-  $("#timeForward").addEventListener("click", () => { state.date = new Date(state.date.getTime() + stepAmount() * 1000); state.lastCatalogUpdate = 0; updateTimeUi(); });
-  $("#nowButton").addEventListener("click", () => { state.date = new Date(); state.timeRate = 1; state.playing = true; speedSelect.value = "1"; $("#playIcon").textContent = "Ⅱ"; state.lastCatalogUpdate = 0; updateTimeUi(); });
+  const stepTime = (direction) => {
+    const wasPlaying = state.playing;
+    const date = new Date(state.date.getTime() + direction * stepAmount() * 1000);
+    runUiAction(() => actions.setObserverTime({ isoTime: date.toISOString() }));
+    state.playing = wasPlaying;
+    syncPlaybackControls();
+  };
+  $("#timeBack").addEventListener("click", () => stepTime(-1));
+  $("#timeForward").addEventListener("click", () => stepTime(1));
+  $("#nowButton").addEventListener("click", () => {
+    runUiAction(() => actions.setObserverTime({ isoTime: new Date().toISOString() }));
+    state.timeRate = 1;
+    state.playing = true;
+    syncPlaybackControls();
+  });
 
   $("#searchInput").addEventListener("input", (event) => renderSearch(event.target.value));
   $("#searchInput").addEventListener("focus", (event) => renderSearch(event.target.value));
@@ -963,13 +1066,25 @@ function bindControls() {
     const button = event.target.closest("[data-id]");
     if (!button) return;
     const object = objectById(button.dataset.id);
-    if (object) { selectObject(object, true); $("#searchInput").value = object.name; }
+    if (object) { runUiAction(() => focusObject(object)); $("#searchInput").value = object.name; }
   });
   $("#tonightList").addEventListener("click", (event) => {
     const button = event.target.closest("[data-id]");
-    if (button) selectObject(objectById(button.dataset.id), true);
+    if (button) runUiAction(() => focusObject(objectById(button.dataset.id)));
   });
-  $("#focusObject").addEventListener("click", () => focusObject(state.selected));
+  $("#focusObject").addEventListener("click", () => runUiAction(() => focusObject(state.selected)));
+  $("#addObjectToPlan").addEventListener("click", () => runUiAction(() => {
+    if (!state.selected) return;
+    actions.addTargetToPlan(state.selected.id);
+    setPlanPanelOpen(true);
+    planUi.render();
+  }));
+
+  $("#planToggle").addEventListener("click", () => {
+    setPlanPanelOpen(!state.planPanelOpen);
+    if (state.planPanelOpen) planUi.render();
+  });
+  $("#closePlan").addEventListener("click", () => setPlanPanelOpen(false));
 
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
@@ -1058,9 +1173,26 @@ function init() {
   state.centerRa = center.ra;
   state.centerDec = center.dec;
   restoreLocation();
+  state.plan = loadPlan(window.localStorage);
+  planUi = mountPlanUi({
+    root: $("#planContent"),
+    toggle: $("#planToggle"),
+    status: $("#planStatus"),
+    actions: plannerActions,
+    getSnapshot: () => ({ preview: state.planPreview, plan: state.plan, tour: state.tour }),
+    onClose: () => setPlanPanelOpen(false),
+  });
   bindControls();
+  planUi.render();
+  updatePlanCount();
+  syncLocationControls();
+  syncLayerControls();
+  syncPlaybackControls();
   resize();
   updateTimeUi();
+  setupWebMcp(actions, document).catch((error) => {
+    console.warn("WebMCP tool registration failed; the atlas remains available without tools.", error);
+  });
   requestAnimationFrame(frame);
 }
 
