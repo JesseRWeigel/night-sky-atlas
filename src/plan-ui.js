@@ -177,6 +177,7 @@ export function mountPlanUi({ root, toggle, status, actions, getSnapshot, onClos
       audience: "general",
       durationMinutes: 30,
     });
+    if (action === "edit-plan") actions.updatePlan({});
     if (action === "save-plan") actions.savePlan({ previewId: getSnapshot().preview.id });
     if (action === "start-tour") actions.advanceTour({ direction: "start" });
     if (action === "next-target") actions.advanceTour({ direction: "next" });

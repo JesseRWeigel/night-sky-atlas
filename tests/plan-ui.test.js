@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { mountPlanUi, renderPlanMarkup } from "../src/plan-ui.js";
 
 test("empty planner directs the user to create or add a target", () => {
@@ -171,6 +172,52 @@ test("mounted planner delegates actions and editable fields with exact values", 
   ]);
   ui.announce("Plan updated");
   assert.equal(status.textContent, "Plan updated");
+});
+
+test("edit action delegates through updatePlan and renders the resulting preview", () => {
+  const document = new FakeEventTarget();
+  const root = new FakeEventTarget(document);
+  const toggle = new FakeEventTarget(document);
+  const status = new FakeEventTarget(document);
+  const calls = [];
+  const saved = {
+    id: "plan-1",
+    title: "Saved route",
+    audience: "general",
+    durationMinutes: 30,
+    notes: "Keep this note",
+    context: { locationName: "New York City", latitude: 40.7128, longitude: -74.006 },
+    targets: [],
+  };
+  const snapshot = {
+    preview: null,
+    plan: saved,
+    tour: { active: false, currentIndex: -1 },
+  };
+  const actions = {
+    updatePlan(value) {
+      calls.push(value);
+      snapshot.preview = { ...structuredClone(saved), status: "preview", source: "manual" };
+    },
+  };
+  const ui = mountPlanUi({ root, toggle, status, actions, getSnapshot: () => snapshot });
+  ui.render();
+  assert.match(root.innerHTML, /Saved route/);
+  assert.match(root.innerHTML, /Start tour/);
+
+  root.dispatch("click", { target: actionTarget({ action: "edit-plan" }) });
+
+  assert.deepEqual(calls, [{}]);
+  assert.match(root.innerHTML, /data-field="title"/);
+  assert.match(root.innerHTML, /value="Saved route"/);
+  assert.match(root.innerHTML, /Keep this note/);
+});
+
+test("mobile plan label remains available to assistive technology", () => {
+  const css = readFileSync(new URL("../plan.css", import.meta.url), "utf8");
+  const labelRule = css.match(/\.plan-toggle > span:nth-child\(2\)\s*\{([^}]*)\}/)?.[1] ?? "";
+  assert.doesNotMatch(labelRule, /display:\s*none/);
+  assert.match(labelRule, /clip-path:\s*inset\(50%\)/);
 });
 
 test("mounted planner focuses its heading on open and returns focus on Escape close", async () => {

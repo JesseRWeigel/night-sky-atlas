@@ -394,9 +394,27 @@ export function createAppActions({
 
   const updatePlan = (input) => {
     requireObject(input, "plan update");
-    const draft = requireDraft();
     const allowed = new Set(["title", "audience", "notes", "durationMinutes", "categoryRequirements", "minAltitude", "startTime", "observer"]);
     const names = Object.keys(input);
+    if (names.length === 0 && !state.planPreview) {
+      if (!state.plan) requireDraft();
+      const saved = structuredClone(state.plan);
+      const preview = normalizeDraft({
+        ...saved,
+        id: createId("preview"),
+        status: "preview",
+        currentIndex: -1,
+        updatedAt: now(),
+        targets: saved.targets.map((target) => ({ ...target, status: "upcoming" })),
+      });
+      validateObservingPlan(preview, buildCatalogAt(preview.context.date));
+      state.planPreview = preview;
+      state.planPanelOpen = true;
+      state.tour = { active: false, currentIndex: -1 };
+      emit("plan-edit-started", `Editing plan ${preview.title}`, { planId: saved.id, previewId: preview.id });
+      return { preview };
+    }
+    const draft = requireDraft();
     if (names.length === 0 || names.some((name) => !allowed.has(name))) throw invalidInput("plan update must include supported fields");
     const startTime = input.startTime === undefined ? draft.context.date : requireIsoTime(input.startTime, "startTime").toISOString();
     const observer = input.observer === undefined ? draft.context : requireObject(input.observer, "observer");

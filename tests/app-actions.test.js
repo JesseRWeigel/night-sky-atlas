@@ -202,6 +202,48 @@ test("empty manual draft updates validate before replacing the preview", () => {
   assert.deepEqual(state, snapshot);
 });
 
+test("empty update converts a saved plan into one editable preview change", () => {
+  const { actions, changes, state } = harness();
+  actions.createManualPlan({ title: "Saved route", audience: "general", durationMinutes: 10 });
+  actions.addTargetToPlan("star-vega");
+  actions.savePlan({ previewId: state.planPreview.id });
+  actions.advanceTour({ direction: "start" });
+  const saved = structuredClone(state.plan);
+  const changeCount = changes.length;
+
+  const result = actions.updatePlan({});
+
+  assert.equal(result.preview.id, "preview-fixed");
+  assert.equal(result.preview.status, "preview");
+  assert.equal(result.preview.currentIndex, -1);
+  assert.deepEqual(result.preview.targets.map((target) => target.status), ["upcoming"]);
+  assert.deepEqual(state.plan, saved);
+  assert.deepEqual(state.tour, { active: false, currentIndex: -1 });
+  assert.equal(changes.length, changeCount + 1);
+  assert.deepEqual(changes.at(-1), {
+    type: "plan-edit-started",
+    message: "Editing plan Saved route",
+    planId: "plan-fixed",
+    previewId: "preview-fixed",
+  });
+  state.planPreview.title = "Changed preview";
+  assert.equal(state.plan.title, "Saved route");
+});
+
+test("invalid saved plans cannot enter editing or emit partial changes", () => {
+  const { actions, changes, state } = harness();
+  actions.createManualPlan({ title: "Saved route", audience: "general", durationMinutes: 10 });
+  actions.addTargetToPlan("star-vega");
+  actions.savePlan({ previewId: state.planPreview.id });
+  state.plan.audience = "unsupported";
+  const snapshot = structuredClone(state);
+  const changeCount = changes.length;
+
+  assert.throws(() => actions.updatePlan({}), (error) => error.code === "INVALID_INPUT");
+  assert.deepEqual(state, snapshot);
+  assert.equal(changes.length, changeCount);
+});
+
 test("plan previews reject whitespace-only titles without mutating state", () => {
   const { actions, state, changes } = harness();
   const snapshot = structuredClone(state);
