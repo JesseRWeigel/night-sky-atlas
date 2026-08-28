@@ -57,13 +57,14 @@ export function targetCategory(object) {
   return null;
 }
 
-export function getTargetAtContext(targetId, context, catalog = buildCatalogAt(context.date)) {
+export function getTargetAtContext(targetId, context, catalog = undefined) {
   if (typeof targetId !== "string" || targetId.trim() === "") {
     throw invalidInput("targetId must be a non-empty string");
   }
   const normalizedContext = normalizeContext(context);
-  if (!Array.isArray(catalog)) throw invalidInput("catalog must be an array");
-  const object = catalog.find((target) => target.id === targetId);
+  const resolvedCatalog = catalog === undefined ? buildCatalogAt(normalizedContext.date) : catalog;
+  if (!Array.isArray(resolvedCatalog)) throw invalidInput("catalog must be an array");
+  const object = resolvedCatalog.find((target) => target.id === targetId);
   if (!object) throw new AppError("TARGET_NOT_FOUND", "Target was not found", { targetId });
   const { alt, az } = equatorialToHorizontal(
     object.ra,
@@ -93,6 +94,13 @@ function requireNumberInRange(value, field, minimum, maximum) {
   return value;
 }
 
+function requireIntegerInRange(value, field, minimum, maximum) {
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw invalidInput(`${field} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return value;
+}
+
 function normalizeObservableFilters(filters) {
   if (!filters || typeof filters !== "object" || Array.isArray(filters)) {
     throw invalidInput("filters must be an object");
@@ -111,7 +119,7 @@ function normalizeObservableFilters(filters) {
     ...(maxMagnitude === undefined
       ? {}
       : { maxMagnitude: requireNumberInRange(maxMagnitude, "maxMagnitude", -30, 15) }),
-    limit: requireNumberInRange(limit, "limit", 1, 12),
+    limit: requireIntegerInRange(limit, "limit", 1, 12),
   };
 }
 
@@ -177,8 +185,7 @@ function normalizePlanRequest(request) {
   if (typeof notes !== "string" || notes.length > 500) {
     throw invalidInput("notes must contain at most 500 characters");
   }
-  const durationMinutes = requireNumberInRange(request.durationMinutes, "durationMinutes", 10, 180);
-  if (!Number.isInteger(durationMinutes)) throw invalidInput("durationMinutes must be an integer");
+  const durationMinutes = requireIntegerInRange(request.durationMinutes, "durationMinutes", 10, 180);
   if (!Array.isArray(request.targetIds) || request.targetIds.length < 1 || request.targetIds.length > 12 ||
       request.targetIds.some((targetId) => typeof targetId !== "string" || targetId === "") ||
       new Set(request.targetIds).size !== request.targetIds.length) {
@@ -319,15 +326,19 @@ export function validateObservingPlan(plan, catalog) {
     throw invalidInput("plan.currentIndex is outside the target range");
   }
   const targetIds = new Set();
+  const categoryCounts = Object.fromEntries(OBSERVABLE_CATEGORIES.map((category) => [category, 0]));
   let durationTotal = 0;
   for (const target of plan.targets) {
     if (!target || typeof target !== "object" || typeof target.targetId !== "string" || targetIds.has(target.targetId)) {
       throw invalidInput("plan targets must have unique IDs");
     }
     targetIds.add(target.targetId);
-    if (!catalog.some((object) => object.id === target.targetId)) {
+    const object = catalog.find((candidate) => candidate.id === target.targetId);
+    if (!object) {
       throw new AppError("TARGET_NOT_FOUND", "Target was not found", { targetId: target.targetId });
     }
+    const category = targetCategory(object);
+    if (category) categoryCounts[category] += 1;
     if (typeof target.name !== "string" || !OBSERVABLE_CATEGORIES.includes(target.category) ||
         !Number.isInteger(target.startOffsetMinutes) || target.startOffsetMinutes < 0 ||
         !Number.isInteger(target.durationMinutes) || target.durationMinutes < 1 ||
@@ -340,5 +351,11 @@ export function validateObservingPlan(plan, catalog) {
     durationTotal += target.durationMinutes;
   }
   if (durationTotal !== plan.durationMinutes) throw invalidInput("target durations must equal plan.durationMinutes");
+  for (const category of OBSERVABLE_CATEGORIES) {
+    if (plan.categoryRequirements[category] > 0 &&
+        categoryCounts[category] !== plan.categoryRequirements[category]) {
+      throw invalidInput("plan target categories do not meet categoryRequirements");
+    }
+  }
   return plan;
 }

@@ -6,6 +6,7 @@ import {
   getTargetAtContext,
   previewObservingPlan,
   targetCategory,
+  validateObservingPlan,
 } from "../src/observing.js";
 
 const NYC = {
@@ -34,6 +35,15 @@ test("target context returns observable coordinates without mutating the catalog
   assert.deepEqual(catalog, before);
 });
 
+test("target context rejects null or missing contexts with an app error", () => {
+  for (const context of [null, undefined]) {
+    assert.throws(
+      () => getTargetAtContext("star-vega", context),
+      (error) => error.code === "INVALID_INPUT",
+    );
+  }
+});
+
 test("observable target search honors category, magnitude, altitude, and limit", () => {
   const catalog = buildCatalogAt(NYC.date);
   const results = findObservableTargets(catalog, NYC, {
@@ -60,6 +70,18 @@ test("observable target search rejects duplicate or unsupported categories", () 
       categories: ["planet", "planet"],
       minAltitude: 0,
       limit: 5,
+    }),
+    (error) => error.code === "INVALID_INPUT",
+  );
+});
+
+test("observable target search rejects fractional limits", () => {
+  const catalog = buildCatalogAt(NYC.date);
+  assert.throws(
+    () => findObservableTargets(catalog, NYC, {
+      categories: ["bright_star"],
+      minAltitude: 0,
+      limit: 1.5,
     }),
     (error) => error.code === "INVALID_INPUT",
   );
@@ -106,5 +128,32 @@ test("plan preview reports altitude constraint failures atomically", () => {
       now: "2026-08-28T20:00:00.000Z",
     }),
     (error) => error.code === "PLAN_CONSTRAINT_FAILED" && error.details.violations.length === 1,
+  );
+});
+
+test("persisted plans reject nonzero category quota mismatches", () => {
+  const catalog = buildCatalogAt(NYC.date);
+  const targetId = findObservableTargets(catalog, NYC, {
+    categories: ["bright_star"],
+    minAltitude: 0,
+    limit: 1,
+  })[0].id;
+  const plan = previewObservingPlan(catalog, {
+    previewId: "preview-validation",
+    title: "Validation plan",
+    audience: "general",
+    durationMinutes: 10,
+    targetIds: [targetId],
+    categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+    minAltitude: 0,
+    context: NYC,
+    now: "2026-08-28T20:00:00.000Z",
+  });
+  assert.throws(
+    () => validateObservingPlan({
+      ...plan,
+      categoryRequirements: { planet: 1, bright_star: 0, deep_sky: 0 },
+    }, catalog),
+    (error) => error.code === "INVALID_INPUT",
   );
 });
