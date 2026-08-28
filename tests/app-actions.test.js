@@ -201,3 +201,61 @@ test("empty manual draft updates validate before replacing the preview", () => {
   );
   assert.deepEqual(state, snapshot);
 });
+
+test("plan previews reject whitespace-only titles without mutating state", () => {
+  const { actions, state, changes } = harness();
+  const snapshot = structuredClone(state);
+  assert.throws(
+    () => actions.previewPlan({
+      title: " ",
+      audience: "general",
+      durationMinutes: 10,
+      targetIds: ["star-vega"],
+      categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+      minAltitude: 0,
+    }),
+    (error) => error.code === "INVALID_INPUT",
+  );
+  assert.deepEqual(state, snapshot);
+  assert.deepEqual(changes, []);
+});
+
+test("save keeps the preview when persistence rejects its structural shape", () => {
+  const { actions, state, changes } = harness();
+  const preview = actions.previewPlan({
+    title: "Valid title",
+    audience: "general",
+    durationMinutes: 10,
+    targetIds: ["star-vega"],
+    categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+    minAltitude: 0,
+  });
+  state.planPreview.title = " ";
+  const snapshot = structuredClone(state);
+  const changeCount = changes.length;
+  assert.throws(
+    () => actions.savePlan({ previewId: preview.preview.id }),
+    (error) => error.code === "INVALID_PLAN",
+  );
+  assert.deepEqual(state, snapshot);
+  assert.equal(changes.length, changeCount);
+});
+
+test("preview rejects a null observer with typed atomic validation", () => {
+  const { actions, state, changes } = harness();
+  const snapshot = structuredClone(state);
+  assert.throws(
+    () => actions.previewPlan({
+      title: "Null observer",
+      audience: "general",
+      durationMinutes: 10,
+      targetIds: ["star-vega"],
+      categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+      minAltitude: 0,
+      observer: null,
+    }),
+    (error) => error.code === "INVALID_INPUT",
+  );
+  assert.deepEqual(state, snapshot);
+  assert.deepEqual(changes, []);
+});

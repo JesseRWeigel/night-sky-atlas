@@ -39,7 +39,7 @@ function requireObject(value, field) {
 }
 
 function requireString(value, field, minimum, maximum) {
-  if (typeof value !== "string" || value.length < minimum || value.length > maximum) {
+  if (typeof value !== "string" || value.trim().length < minimum || value.length > maximum) {
     throw invalidInput(`${field} must contain between ${minimum} and ${maximum} characters`);
   }
   return value;
@@ -278,7 +278,10 @@ export function createAppActions({
 
   const previewPlan = (input) => {
     requireObject(input, "plan request");
-    const observer = input.observer === undefined ? context(input.startTime === undefined ? state.date : requireIsoTime(input.startTime, "startTime")) : input.observer;
+    requireString(input.title, "title", 1, 90);
+    const observer = input.observer === undefined
+      ? context(input.startTime === undefined ? state.date : requireIsoTime(input.startTime, "startTime"))
+      : requireObject(input.observer, "observer");
     const planContext = {
       date: new Date(input.startTime === undefined ? state.date : requireIsoTime(input.startTime, "startTime")).toISOString(),
       latitude: observer.latitude,
@@ -317,17 +320,20 @@ export function createAppActions({
     };
     delete saved.source;
     validateObservingPlan(saved, buildCatalogAt(saved.context.date));
-    state.plan = saved;
-    state.planPreview = null;
-    state.planPanelOpen = true;
     try {
       persistPlan(storage, saved);
     } catch (error) {
       if (error instanceof AppError && error.code === "PERSISTENCE_UNAVAILABLE") {
+        state.plan = saved;
+        state.planPreview = null;
+        state.planPanelOpen = true;
         emit("plan-save-memory-only", "Plan is active for this page but could not be stored", { planId: saved.id });
       }
       throw error;
     }
+    state.plan = saved;
+    state.planPreview = null;
+    state.planPanelOpen = true;
     emit("plan-saved", `Saved plan ${saved.title}`, { planId: saved.id });
     return { plan: saved };
   };
