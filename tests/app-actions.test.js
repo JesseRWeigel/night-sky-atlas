@@ -100,6 +100,37 @@ test("survey mode transitions preserve a framed target across coordinate systems
   assert.ok(Math.abs(state.centerDec - framed.dec) < 0.001);
 });
 
+test("direct framing uses horizontal coordinates when deep survey is off", () => {
+  const { actions, state } = harness();
+  state.fov = 12;
+  state.survey = "off";
+
+  actions.frameTarget({ targetId: "star-vega", fieldOfView: 12 });
+
+  assert.ok(Math.abs(state.centerAz - 158.27) < 0.02);
+  assert.ok(Math.abs(state.centerAlt - 87.93) < 0.02);
+  assert.equal(state.centerRa, 0);
+  assert.equal(state.centerDec, 0);
+});
+
+test("tour advancement uses horizontal coordinates when deep survey is off", () => {
+  const { actions, state } = harness();
+  actions.createManualPlan({ title: "Local sky", audience: "general", durationMinutes: 10 });
+  actions.addTargetToPlan("star-vega");
+  actions.savePlan({ previewId: state.planPreview.id });
+  state.fov = 12;
+  state.survey = "off";
+  state.centerRa = 12;
+  state.centerDec = -20;
+
+  actions.advanceTour({ direction: "start" });
+
+  assert.ok(Math.abs(state.centerAz - 158.27) < 0.02);
+  assert.ok(Math.abs(state.centerAlt - 87.93) < 0.02);
+  assert.equal(state.centerRa, 12);
+  assert.equal(state.centerDec, -20);
+});
+
 test("empty layer configuration is rejected without mutation", () => {
   const { actions, state } = harness();
   const snapshot = structuredClone(state);

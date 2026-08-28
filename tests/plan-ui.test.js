@@ -129,6 +129,48 @@ function fieldTarget(field, value) {
   return target;
 }
 
+class ReplacingPlanRoot extends FakeEventTarget {
+  constructor(ownerDocument) {
+    super(ownerDocument);
+    this.fields = new Map();
+  }
+
+  set innerHTML(value) {
+    this._innerHTML = value;
+    if (!this.fields) return;
+    this.ownerDocument.activeElement = null;
+    this.fields = new Map();
+    const title = value.match(/data-field="title"[^>]*value="([^"]*)"/)?.[1];
+    if (title === undefined) return;
+    const field = fieldTarget("title", title);
+    field.ownerDocument = this.ownerDocument;
+    field.parentNode = this;
+    field.selectionStart = 0;
+    field.selectionEnd = 0;
+    field.selectionDirection = "none";
+    field.focus = () => { this.ownerDocument.activeElement = field; };
+    field.setSelectionRange = (start, end, direction = "none") => {
+      field.selectionStart = start;
+      field.selectionEnd = end;
+      field.selectionDirection = direction;
+    };
+    this.fields.set("title", field);
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  contains(node) {
+    return node?.parentNode === this;
+  }
+
+  querySelector(selector) {
+    const field = selector.match(/^\[data-field="([^"]+)"\]$/)?.[1];
+    return field ? this.fields.get(field) ?? null : null;
+  }
+}
+
 test("mounted planner delegates actions and editable fields with exact values", () => {
   const calls = [];
   const document = new FakeEventTarget();
@@ -172,6 +214,43 @@ test("mounted planner delegates actions and editable fields with exact values", 
   ]);
   ui.announce("Plan updated");
   assert.equal(status.textContent, "Plan updated");
+});
+
+test("planner rerenders preserve focus and selection across multi-character input", () => {
+  const document = new FakeEventTarget();
+  document.activeElement = null;
+  const root = new ReplacingPlanRoot(document);
+  const toggle = new FakeEventTarget(document);
+  const status = new FakeEventTarget(document);
+  const snapshot = {
+    preview: { id: "preview-1", title: "", audience: "general", durationMinutes: 30, notes: "", targets: [] },
+    plan: null,
+    tour: { active: false, currentIndex: -1 },
+  };
+  let ui;
+  const actions = {
+    updatePlan(value) {
+      snapshot.preview = { ...snapshot.preview, ...value };
+      ui.render();
+    },
+  };
+  ui = mountPlanUi({ root, toggle, status, actions, getSnapshot: () => snapshot });
+  ui.render();
+
+  for (const value of ["M", "Ma", "Mars"]) {
+    const field = root.querySelector('[data-field="title"]');
+    field.focus();
+    field.value = value;
+    field.selectionStart = value.length;
+    field.selectionEnd = value.length;
+    root.dispatch("input", { target: field });
+
+    const replacement = root.querySelector('[data-field="title"]');
+    assert.equal(document.activeElement, replacement);
+    assert.equal(replacement.value, value);
+    assert.equal(replacement.selectionStart, value.length);
+    assert.equal(replacement.selectionEnd, value.length);
+  }
 });
 
 test("edit action delegates through updatePlan and renders the resulting preview", () => {

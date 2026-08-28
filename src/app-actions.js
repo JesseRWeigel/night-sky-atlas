@@ -197,7 +197,7 @@ export function createAppActions({
       : requireCoordinate(input.fieldOfView, "fieldOfView", 0.05, 180);
     const horizontal = equatorialToHorizontal(target.ra, target.dec, state.date, state.latitude, state.longitude);
     state.fov = fieldOfView;
-    if (fieldOfView < 28) {
+    if (fieldOfView < 28 && state.survey !== "off") {
       state.centerRa = target.ra;
       state.centerDec = clamp(target.dec, -89.5, 89.5);
     } else {
@@ -524,7 +524,7 @@ export function createAppActions({
     state.playing = false;
     if ("lastCatalogUpdate" in state) state.lastCatalogUpdate = 0;
     state.selected = target;
-    if (state.fov < 28) {
+    if (state.fov < 28 && state.survey !== "off") {
       state.centerRa = target.ra;
       state.centerDec = clamp(target.dec, -89.5, 89.5);
     } else {

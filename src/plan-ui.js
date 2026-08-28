@@ -161,7 +161,19 @@ export function renderPlanMarkup(snapshot = {}) {
 
 export function mountPlanUi({ root, toggle, status, actions, getSnapshot, onClose = () => {} }) {
   const render = () => {
+    const active = root.ownerDocument.activeElement;
+    const activeField = active && root.contains(active) ? active.dataset.field : null;
+    const selection = activeField && Number.isInteger(active.selectionStart) && Number.isInteger(active.selectionEnd)
+      ? { start: active.selectionStart, end: active.selectionEnd, direction: active.selectionDirection || "none" }
+      : null;
     root.innerHTML = renderPlanMarkup(getSnapshot());
+    const replacement = activeField ? root.querySelector(`[data-field="${activeField}"]`) : null;
+    if (replacement) {
+      replacement.focus();
+      if (selection && typeof replacement.setSelectionRange === "function") {
+        replacement.setSelectionRange(selection.start, selection.end, selection.direction);
+      }
+    }
   };
   const close = () => {
     onClose();
