@@ -124,11 +124,16 @@ class FakeEventTarget {
   }
 
   addEventListener(type, listener) {
-    this.listeners.set(type, listener);
+    const listeners = this.listeners.get(type) || [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
   }
 
   dispatch(type, event = {}) {
-    this.listeners.get(type)?.(event);
+    for (const listener of this.listeners.get(type) || []) {
+      listener(event);
+      if (event.immediatePropagationStopped) break;
+    }
   }
 
   getAttribute(name) {
@@ -357,12 +362,14 @@ test("mounted planner focuses its heading after click activation and returns foc
   assert.equal(closeCount, 1);
 });
 
-test("mounted planner yields Escape while a higher-priority surface is open", () => {
-  let closeCount = 0;
-  let shouldCloseOnEscape = false;
+test("planner's earlier Escape listener closes a higher-priority shell overlay before the plan", () => {
+  let planCloseCount = 0;
+  let shellFallbackCount = 0;
+  let overlayOpen = true;
   const document = new FakeEventTarget();
   const root = new FakeEventTarget(document);
   const toggle = new FakeEventTarget(document);
+  const overlayToggle = new FakeEventTarget(document);
   const status = new FakeEventTarget(document);
   toggle.setAttribute("aria-expanded", "true");
   mountPlanUi({
@@ -371,18 +378,34 @@ test("mounted planner yields Escape while a higher-priority surface is open", ()
     status,
     actions: {},
     getSnapshot: () => ({ plan: null, preview: null, tour: { active: false, currentIndex: -1 } }),
-    onClose: () => { closeCount += 1; },
-    shouldCloseOnEscape: () => shouldCloseOnEscape,
+    onClose: () => { planCloseCount += 1; },
+    closeTopmostOverlay: () => {
+      if (!overlayOpen) return false;
+      overlayOpen = false;
+      overlayToggle.focus();
+      return true;
+    },
+  });
+  document.addEventListener("keydown", () => { shellFallbackCount += 1; });
+
+  const escapeEvent = () => ({
+    key: "Escape",
+    immediatePropagationStopped: false,
+    preventDefault() {},
+    stopImmediatePropagation() { this.immediatePropagationStopped = true; },
   });
 
-  document.dispatch("keydown", { key: "Escape" });
-  assert.equal(closeCount, 0);
+  document.dispatch("keydown", escapeEvent());
+  assert.equal(overlayOpen, false);
+  assert.equal(overlayToggle.focusCount, 1);
+  assert.equal(planCloseCount, 0);
   assert.equal(toggle.focusCount, 0);
+  assert.equal(shellFallbackCount, 0);
 
-  shouldCloseOnEscape = true;
-  document.dispatch("keydown", { key: "Escape" });
-  assert.equal(closeCount, 1);
+  document.dispatch("keydown", escapeEvent());
+  assert.equal(planCloseCount, 1);
   assert.equal(toggle.focusCount, 1);
+  assert.equal(shellFallbackCount, 0);
 });
 
 test("mounted planner close control returns focus to the Plan toggle", () => {

@@ -1158,10 +1158,6 @@ function bindControls() {
   canvas.addEventListener("pointercancel", () => { state.dragging = null; });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && closeTopmostOverlay()) {
-      event.preventDefault();
-      return;
-    }
     if (event.key === "/" && !event.ctrlKey && !event.metaKey) { event.preventDefault(); $("#searchInput").focus(); }
     if (event.target.matches("input, select")) return;
     if (event.key === " ") { event.preventDefault(); $("#playToggle").click(); }
@@ -1211,7 +1207,7 @@ function init() {
     actions: plannerActions,
     getSnapshot: () => ({ preview: state.planPreview, plan: state.plan, tour: state.tour }),
     onClose: () => setPlanPanelOpen(false),
-    shouldCloseOnEscape: () => !inspector.classList.contains("open"),
+    closeTopmostOverlay,
   });
   bindControls();
   planUi.render();

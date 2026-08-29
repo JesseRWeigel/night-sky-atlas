@@ -648,7 +648,7 @@ a { color: #91d7ff; }
   .header-actions { gap: 6px; }
   .header-actions .chip-button,
   .header-actions .icon-button { width: 44px; min-height: 44px; padding: 0; justify-content: center; border-radius: 14px; }
-  .header-actions .tonight-button { display: none; }
+  .header-actions .tonight-button { display: flex; }
   .header-actions #aboutToggle { display: none; }
   .header-actions .vr-mode-link { width: 44px; }
   .header-actions .vr-mode-link > span:last-child { display: none; }

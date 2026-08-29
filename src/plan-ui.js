@@ -167,7 +167,7 @@ export function mountPlanUi({
   actions,
   getSnapshot,
   onClose = () => {},
-  shouldCloseOnEscape = () => true,
+  closeTopmostOverlay = () => false,
 }) {
   const render = () => {
     const active = root.ownerDocument.activeElement;
@@ -238,9 +238,12 @@ export function mountPlanUi({
     }, 0);
   });
   root.ownerDocument.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || toggle.getAttribute("aria-expanded") !== "true" || !shouldCloseOnEscape()) return;
+    if (event.key !== "Escape") return;
+    const closedOverlay = closeTopmostOverlay();
+    if (!closedOverlay && toggle.getAttribute("aria-expanded") !== "true") return;
     event.preventDefault?.();
     event.stopImmediatePropagation?.();
+    if (closedOverlay) return;
     close();
   });
 
