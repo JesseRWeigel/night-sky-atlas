@@ -311,7 +311,11 @@ export function createAppActions({
       context: planContext,
       now: now(),
     });
-    const preview = { ...rawPreview, minAltitude: input.minAltitude };
+    const preview = {
+      ...rawPreview,
+      minAltitude: input.minAltitude,
+      ...(input.source === "agent" ? { source: "agent" } : {}),
+    };
     state.planPreview = preview;
     state.planPanelOpen = true;
     emit("plan-previewed", `Previewed a ${preview.durationMinutes}-minute plan with ${preview.targets.length} targets`, { previewId: preview.id });

@@ -181,6 +181,7 @@ export function createWebMcpTools(actions) {
           longitude: input.observer.longitude,
           locationName: input.observer.location_name,
         },
+        source: "agent",
       })),
     },
     {

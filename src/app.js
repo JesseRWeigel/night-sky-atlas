@@ -831,6 +831,13 @@ function syncLocationControls() {
   $("#latitudeInput").value = state.latitude.toFixed(4);
   $("#longitudeInput").value = state.longitude.toFixed(4);
   $("#locationName").textContent = state.locationName;
+  const sitePreset = $("#sitePreset");
+  const matchingPreset = [...sitePreset.options].find((option) => {
+    const [latitude, longitude] = option.value.split(",");
+    return Math.abs(Number(latitude) - state.latitude) < 0.00005
+      && Math.abs(Number(longitude) - state.longitude) < 0.00005;
+  });
+  sitePreset.value = matchingPreset?.value || "custom";
 }
 
 function syncPlaybackControls() {

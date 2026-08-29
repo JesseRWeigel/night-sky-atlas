@@ -453,6 +453,12 @@ button.plan-target-name:hover {
   margin-right: auto;
 }
 
+@media (min-width: 761px) and (max-width: 1364px) {
+  .workspace:has(.plan-rail.open) .time-console {
+    left: calc((100vw + 372px) / 2);
+  }
+}
+
 @media (max-width: 760px) {
   .plan-toggle > span:nth-child(2) {
     position: absolute;
@@ -503,6 +509,11 @@ button.plan-target-name:hover {
     width: 40px;
     height: 40px;
     flex-basis: 40px;
+  }
+
+  .plan-form input,
+  .plan-form select {
+    min-height: 40px;
   }
 
   button.plan-target-name,

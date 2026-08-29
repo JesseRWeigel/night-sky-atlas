@@ -162,12 +162,15 @@ test("preview and save preserve observer context until an explicit observer acti
       longitude: -0.1278,
       locationName: "London",
     },
+    source: "agent",
   });
   assert.equal(state.locationName, "New York City");
   assert.equal(state.planPreview.context.locationName, "London");
+  assert.equal(state.planPreview.source, "agent");
   assert.equal(changes.at(-1).type, "plan-previewed");
   const saved = actions.savePlan({ previewId: preview.preview.id });
   assert.equal(state.plan.status, "saved");
+  assert.equal("source" in state.plan, false);
   assert.equal(state.locationName, "New York City");
   assert.equal(saved.plan.id, "plan-fixed");
 });

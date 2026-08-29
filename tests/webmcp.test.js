@@ -91,6 +91,7 @@ test("tool handlers translate every snake_case input and serialize expected erro
       categoryRequirements: { planet: 1, bright_star: 1, deep_sky: 1 }, minAltitude: 25,
       startTime: "2026-08-29T01:00:00.000Z",
       observer: { latitude: 40.7128, longitude: -74.006, locationName: "New York City" },
+      source: "agent",
     }] },
     { name: "savePlan", args: [{ previewId: "preview-1" }] },
     { name: "advanceTour", args: [{ targetIndex: 2 }] },
