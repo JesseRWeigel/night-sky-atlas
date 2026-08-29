@@ -299,7 +299,7 @@ test("mobile plan label remains available to assistive technology", () => {
   assert.match(labelRule, /clip-path:\s*inset\(50%\)/);
 });
 
-test("mounted planner focuses its heading on open and returns focus on Escape close", async () => {
+test("mounted planner focuses its heading after click activation and returns focus on Escape close", async () => {
   let closeCount = 0;
   const document = new FakeEventTarget();
   const root = new FakeEventTarget(document);
@@ -320,6 +320,8 @@ test("mounted planner focuses its heading on open and returns focus on Escape cl
   });
   toggle.dispatch("click");
   await Promise.resolve();
+  assert.equal(heading.focusCount, 0);
+  await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(heading.focusCount, 1);
   document.dispatch("keydown", { key: "Escape" });
   assert.equal(closeCount, 1);
@@ -327,4 +329,27 @@ test("mounted planner focuses its heading on open and returns focus on Escape cl
   toggle.setAttribute("aria-expanded", "false");
   document.dispatch("keydown", { key: "Escape" });
   assert.equal(closeCount, 1);
+});
+
+test("mounted planner close control returns focus to the Plan toggle", () => {
+  let closeCount = 0;
+  const document = new FakeEventTarget();
+  const root = new FakeEventTarget(document);
+  const toggle = new FakeEventTarget(document);
+  const closeButton = new FakeEventTarget(document);
+  const status = new FakeEventTarget(document);
+  mountPlanUi({
+    root,
+    toggle,
+    closeButton,
+    status,
+    actions: {},
+    getSnapshot: () => ({ plan: null, preview: null, tour: { active: false, currentIndex: -1 } }),
+    onClose: () => { closeCount += 1; },
+  });
+
+  closeButton.dispatch("click");
+
+  assert.equal(closeCount, 1);
+  assert.equal(toggle.focusCount, 1);
 });

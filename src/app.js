@@ -1091,7 +1091,6 @@ function bindControls() {
     setPlanPanelOpen(!state.planPanelOpen);
     if (state.planPanelOpen) planUi.render();
   });
-  $("#closePlan").addEventListener("click", () => setPlanPanelOpen(false));
 
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
@@ -1184,6 +1183,7 @@ function init() {
   planUi = mountPlanUi({
     root: $("#planContent"),
     toggle: $("#planToggle"),
+    closeButton: $("#closePlan"),
     status: $("#planStatus"),
     actions: plannerActions,
     getSnapshot: () => ({ preview: state.planPreview, plan: state.plan, tour: state.tour }),

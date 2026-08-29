@@ -159,7 +159,7 @@ export function renderPlanMarkup(snapshot = {}) {
   return renderEmpty();
 }
 
-export function mountPlanUi({ root, toggle, status, actions, getSnapshot, onClose = () => {} }) {
+export function mountPlanUi({ root, toggle, closeButton, status, actions, getSnapshot, onClose = () => {} }) {
   const render = () => {
     const active = root.ownerDocument.activeElement;
     const activeField = active && root.contains(active) ? active.dataset.field : null;
@@ -179,6 +179,8 @@ export function mountPlanUi({ root, toggle, status, actions, getSnapshot, onClos
     onClose();
     toggle.focus();
   };
+
+  closeButton?.addEventListener("click", close);
 
   root.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
@@ -220,11 +222,11 @@ export function mountPlanUi({ root, toggle, status, actions, getSnapshot, onClos
   root.addEventListener("submit", (event) => event.preventDefault());
 
   toggle.addEventListener("click", () => {
-    queueMicrotask(() => {
+    setTimeout(() => {
       if (toggle.getAttribute("aria-expanded") !== "true") return;
       const rail = root.ownerDocument.getElementById(toggle.getAttribute("aria-controls"));
       rail?.querySelector("h2")?.focus();
-    });
+    }, 0);
   });
   root.ownerDocument.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") close();
