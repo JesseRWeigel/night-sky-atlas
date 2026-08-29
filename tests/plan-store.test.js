@@ -97,3 +97,25 @@ test("plan loading ignores structurally incomplete plans", () => {
   storage.setItem(PLAN_STORAGE_KEY, JSON.stringify({ ...validPlan, currentIndex: 1 }));
   assert.equal(loadPlan(storage), null);
 });
+
+test("plan loading rejects missing metadata, invalid duration bounds, and inconsistent slot totals", () => {
+  const malformedPlans = [
+    ["audience", (plan) => { delete plan.audience; }],
+    ["notes", (plan) => { delete plan.notes; }],
+    ["category requirements", (plan) => { delete plan.categoryRequirements; }],
+    ["created timestamp", (plan) => { delete plan.createdAt; }],
+    ["updated timestamp", (plan) => { delete plan.updatedAt; }],
+    ["minimum duration", (plan) => { plan.durationMinutes = 9; plan.targets[0].durationMinutes = 9; }],
+    ["maximum duration", (plan) => { plan.durationMinutes = 181; plan.targets[0].durationMinutes = 181; }],
+    ["integer duration", (plan) => { plan.durationMinutes = 10.5; plan.targets[0].durationMinutes = 10; }],
+    ["slot total", (plan) => { plan.targets[0].durationMinutes = 9; }],
+  ];
+
+  for (const [label, mutate] of malformedPlans) {
+    const storage = memoryStorage();
+    const plan = structuredClone(validPlan);
+    mutate(plan);
+    storage.setItem(PLAN_STORAGE_KEY, JSON.stringify(plan));
+    assert.equal(loadPlan(storage), null, label);
+  }
+});

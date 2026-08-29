@@ -14,10 +14,10 @@ import {
   unprojectHorizontal,
 } from "./astronomy.js";
 import { AppError } from "./app-error.js";
-import { createAppActions } from "./app-actions.js";
+import { createAppActions, restoreSavedPlan } from "./app-actions.js";
 import { CATALOG, CONSTELLATION_LINES, DEEP_SKY, SOLAR_SYSTEM_INFO, STARS } from "./catalog.js";
 import { loadPlan } from "./plan-store.js";
-import { mountPlanUi } from "./plan-ui.js";
+import { mountPlanUi, planChipPresentation } from "./plan-ui.js";
 import { setupWebMcp } from "./webmcp.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -854,9 +854,9 @@ function syncLayerControls() {
 }
 
 function updatePlanCount() {
-  const count = (state.planPreview || state.plan)?.targets?.length || 0;
-  $("#planCount").textContent = String(count);
-  $("#planCount").setAttribute("aria-label", `${count} ${count === 1 ? "target" : "targets"}`);
+  const presentation = planChipPresentation({ preview: state.planPreview, plan: state.plan, tour: state.tour });
+  $("#planCount").textContent = presentation.text;
+  $("#planCount").setAttribute("aria-label", presentation.ariaLabel);
 }
 
 function setPlanPanelOpen(open) {
@@ -913,7 +913,14 @@ function runUiAction(callback) {
   } catch (error) {
     if (error instanceof AppError) {
       planUi.announce(error.message);
-      return undefined;
+      return {
+        ok: false,
+        error: {
+          code: error.code,
+          message: error.message,
+          ...(error.details === undefined ? {} : { details: error.details }),
+        },
+      };
     }
     console.error("Unexpected atlas UI action failure", error);
     throw error;
@@ -1198,7 +1205,7 @@ function init() {
   state.centerRa = center.ra;
   state.centerDec = center.dec;
   restoreLocation();
-  state.plan = loadPlan(window.localStorage);
+  restoreSavedPlan(state, loadPlan(window.localStorage));
   planUi = mountPlanUi({
     root: $("#planContent"),
     toggle: $("#planToggle"),
@@ -1212,6 +1219,12 @@ function init() {
   bindControls();
   planUi.render();
   updatePlanCount();
+  setPlanPanelOpen(state.planPanelOpen);
+  if (state.tour.active && state.selected) {
+    showInspector(state.selected);
+    inspector.classList.add("open");
+    $("#tonightToggle").setAttribute("aria-expanded", "true");
+  }
   syncLocationControls();
   syncLayerControls();
   syncPlaybackControls();

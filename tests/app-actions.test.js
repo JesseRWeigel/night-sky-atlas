@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createAppActions } from "../src/app-actions.js";
+import * as appActionsModule from "../src/app-actions.js";
+import { PLAN_STORAGE_KEY } from "../src/plan-store.js";
 
-function harness() {
+const { createAppActions } = appActionsModule;
+
+function harness(storageOverride = null) {
   const changes = [];
   const stored = new Map();
   const state = {
@@ -27,7 +30,7 @@ function harness() {
   };
   const actions = createAppActions({
     state,
-    storage: {
+    storage: storageOverride || {
       getItem: (key) => stored.get(key) ?? null,
       setItem: (key, value) => stored.set(key, value),
       removeItem: (key) => stored.delete(key),
@@ -37,6 +40,16 @@ function harness() {
     createId: (prefix) => prefix + "-fixed",
   });
   return { actions, changes, state, stored };
+}
+
+function startedTwoTargetPlan() {
+  const { actions, state } = harness();
+  actions.createManualPlan({ title: "Restored route", audience: "general", durationMinutes: 20 });
+  actions.addTargetToPlan("star-vega");
+  actions.addTargetToPlan("star-arcturus");
+  actions.savePlan({ previewId: state.planPreview.id });
+  actions.advanceTour({ direction: "start" });
+  return structuredClone(state.plan);
 }
 
 test("sky context and target detail actions do not emit mutations", () => {
@@ -236,16 +249,104 @@ test("manual target edits and tour advancement share the saved plan state", () =
 });
 
 test("tour boundary rejects the next direction without changing progress", () => {
-  const { actions, state } = harness();
+  const { actions, changes, state, stored } = harness();
   actions.createManualPlan({ title: "One target", audience: "general", durationMinutes: 10 });
   actions.addTargetToPlan("star-vega");
   actions.savePlan({ previewId: state.planPreview.id });
   actions.advanceTour({ direction: "start" });
   const snapshot = structuredClone(state);
+  const persistedSnapshot = stored.get(PLAN_STORAGE_KEY);
+  const changeCount = changes.length;
   assert.throws(
     () => actions.advanceTour({ direction: "next" }),
     (error) => error.code === "TOUR_BOUNDARY",
   );
+  assert.deepEqual(state, snapshot);
+  assert.equal(stored.get(PLAN_STORAGE_KEY), persistedSnapshot);
+  assert.equal(changes.length, changeCount);
+});
+
+test("each successful tour advancement persists its validated progress", () => {
+  const { actions, changes, state, stored } = harness();
+  actions.createManualPlan({ title: "Stored progress", audience: "general", durationMinutes: 20 });
+  actions.addTargetToPlan("star-vega");
+  actions.addTargetToPlan("star-arcturus");
+  actions.savePlan({ previewId: state.planPreview.id });
+  const changeCount = changes.length;
+
+  const result = actions.advanceTour({ direction: "start" });
+  const persisted = JSON.parse(stored.get(PLAN_STORAGE_KEY));
+
+  assert.equal(result.persisted, true);
+  assert.equal(persisted.currentIndex, 0);
+  assert.deepEqual(persisted.targets.map((target) => target.status), ["current", "upcoming"]);
+  assert.equal(changes.length, changeCount + 1);
+  assert.equal(changes.at(-1).type, "tour-advanced");
+  assert.equal(changes.at(-1).persisted, true);
+});
+
+test("tour advancement remains usable and reports memory-only progress when storage fails", () => {
+  const values = new Map();
+  let writes = 0;
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem(key, value) {
+      writes += 1;
+      if (writes > 1) throw new Error("storage denied");
+      values.set(key, value);
+    },
+    removeItem: (key) => values.delete(key),
+  };
+  const { actions, changes, state } = harness(storage);
+  actions.createManualPlan({ title: "Memory route", audience: "general", durationMinutes: 10 });
+  actions.addTargetToPlan("star-vega");
+  actions.savePlan({ previewId: state.planPreview.id });
+  const changeCount = changes.length;
+
+  const result = actions.advanceTour({ direction: "start" });
+
+  assert.equal(writes, 2);
+  assert.equal(result.persisted, false);
+  assert.equal(result.warning.code, "PERSISTENCE_UNAVAILABLE");
+  assert.equal(state.plan.currentIndex, 0);
+  assert.deepEqual(state.tour, { active: true, currentIndex: 0 });
+  assert.equal(changes.length, changeCount + 1);
+  assert.equal(changes.at(-1).type, "tour-advanced");
+  assert.equal(changes.at(-1).persisted, false);
+  assert.match(changes.at(-1).message, /could not be stored/i);
+});
+
+test("startup restoration makes persisted tour progress active and advances from it", () => {
+  assert.equal(typeof appActionsModule.restoreSavedPlan, "function");
+  const savedPlan = startedTwoTargetPlan();
+  const { actions, state } = harness();
+
+  const restored = appActionsModule.restoreSavedPlan(state, savedPlan);
+
+  assert.equal(restored, state.plan);
+  assert.deepEqual(state.tour, { active: true, currentIndex: 0 });
+  assert.equal(state.planPanelOpen, true);
+  assert.equal(state.selected.id, "star-vega");
+  assert.equal(state.date.toISOString(), savedPlan.targets[0].scheduledTime);
+  assert.equal(state.playing, false);
+  assert.notEqual(state.centerAz, 180);
+  assert.notEqual(state.centerAlt, 45);
+
+  const result = actions.advanceTour({ direction: "next" });
+  assert.equal(result.tour.currentIndex, 1);
+  assert.equal(state.selected.id, "star-arcturus");
+});
+
+test("startup restoration ignores a structurally valid plan with an unknown catalog target", () => {
+  assert.equal(typeof appActionsModule.restoreSavedPlan, "function");
+  const savedPlan = startedTwoTargetPlan();
+  savedPlan.targets[0].targetId = "catalog-object-removed";
+  const { state } = harness();
+  const snapshot = structuredClone(state);
+
+  const restored = appActionsModule.restoreSavedPlan(state, savedPlan);
+
+  assert.equal(restored, null);
   assert.deepEqual(state, snapshot);
 });
 

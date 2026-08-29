@@ -4,6 +4,15 @@ const CATEGORY_LABELS = {
   deep_sky: "Deep sky",
 };
 
+export function planChipPresentation(snapshot = {}) {
+  const count = (snapshot.preview || snapshot.plan)?.targets?.length || 0;
+  const index = snapshot.tour?.currentIndex;
+  if (snapshot.plan && snapshot.tour?.active && Number.isInteger(index) && index >= 0 && index < count) {
+    return { text: `${index + 1}/${count}`, ariaLabel: `Tour target ${index + 1} of ${count}` };
+  }
+  return { text: String(count), ariaLabel: `${count} ${count === 1 ? "target" : "targets"}` };
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
     "&": "&amp;",
@@ -224,7 +233,11 @@ export function mountPlanUi({
     const field = event.target.closest("[data-field]");
     if (!field || !allowedFields.includes(field.dataset.field)) return;
     const value = field.dataset.field === "durationMinutes" ? Number(field.value) : field.value;
-    actions.updatePlan({ [field.dataset.field]: value });
+    const result = actions.updatePlan({ [field.dataset.field]: value });
+    if (result?.ok === false) {
+      if (result.error?.message) status.textContent = result.error.message;
+      render();
+    }
   };
   root.addEventListener("input", (event) => updateField(event, ["title", "notes"]));
   root.addEventListener("change", (event) => updateField(event, ["audience", "durationMinutes"]));

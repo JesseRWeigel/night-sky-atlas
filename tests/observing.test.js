@@ -111,6 +111,54 @@ test("plan preview allocates exact duration and enforces category counts", () =>
   assert.deepEqual(preview.targets.map((target) => target.durationMinutes), [11, 10, 10]);
   assert.equal(preview.targets.reduce((sum, target) => sum + target.durationMinutes, 0), 31);
   assert.ok(preview.targets.every((target) => target.minimumAltitude >= 0));
+  assert.equal(validateObservingPlan(preview, catalog), preview);
+});
+
+test("plan preview rejects target counts that cannot receive a positive minute slot", () => {
+  const sourceCatalog = buildCatalogAt(NYC.date);
+  const vega = sourceCatalog.find((target) => target.id === "star-vega");
+  const catalog = Array.from({ length: 11 }, (_, index) => ({
+    ...vega,
+    id: `test-planet-${index + 1}`,
+    name: `Test planet ${index + 1}`,
+    isSolarSystem: true,
+  }));
+
+  assert.throws(
+    () => previewObservingPlan(catalog, {
+      previewId: "preview-too-crowded",
+      title: "Too many stops",
+      audience: "general",
+      durationMinutes: 10,
+      targetIds: catalog.map((target) => target.id),
+      categoryRequirements: { planet: 0, bright_star: 0, deep_sky: 0 },
+      minAltitude: 0,
+      context: NYC,
+      now: "2026-08-28T20:00:00.000Z",
+    }),
+    (error) => error.code === "INVALID_INPUT" && /durationMinutes/i.test(error.message),
+  );
+});
+
+test("plan preview rejects Sun and other targets outside observable categories", () => {
+  const midday = { ...NYC, date: "2026-08-29T17:00:00.000Z" };
+  const catalog = buildCatalogAt(midday.date);
+  const sun = catalog.find((target) => target.name === "Sun");
+
+  assert.throws(
+    () => previewObservingPlan(catalog, {
+      previewId: "preview-sun",
+      title: "Unsupported stop",
+      audience: "general",
+      durationMinutes: 10,
+      targetIds: [sun.id],
+      categoryRequirements: { planet: 0, bright_star: 0, deep_sky: 0 },
+      minAltitude: 0,
+      context: midday,
+      now: "2026-08-28T20:00:00.000Z",
+    }),
+    (error) => error.code === "INVALID_INPUT" && /observable categor/i.test(error.message),
+  );
 });
 
 test("plan preview reports altitude constraint failures atomically", () => {

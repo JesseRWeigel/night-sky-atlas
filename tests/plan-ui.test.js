@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mountPlanUi, renderPlanMarkup } from "../src/plan-ui.js";
+import * as planUiModule from "../src/plan-ui.js";
+
+const { mountPlanUi, renderPlanMarkup } = planUiModule;
 
 test("empty planner directs the user to create or add a target", () => {
   const html = renderPlanMarkup({ plan: null, preview: null, tour: { active: false, currentIndex: -1 } });
@@ -85,6 +87,20 @@ test("tour markup exposes textual progress and previous-next controls", () => {
   assert.match(html, /Target 1 of 2/);
   assert.match(html, /Previous target/);
   assert.match(html, /Next target/);
+});
+
+test("plan chip shows tour position while preserving the target count outside a tour", () => {
+  assert.equal(typeof planUiModule.planChipPresentation, "function");
+  const plan = { targets: [{}, {}, {}] };
+
+  assert.deepEqual(
+    planUiModule.planChipPresentation({ plan, preview: null, tour: { active: false, currentIndex: -1 } }),
+    { text: "3", ariaLabel: "3 targets" },
+  );
+  assert.deepEqual(
+    planUiModule.planChipPresentation({ plan, preview: null, tour: { active: true, currentIndex: 1 } }),
+    { text: "2/3", ariaLabel: "Tour target 2 of 3" },
+  );
 });
 
 test("saved planner offers edit and tour actions while escaping authored text", () => {
@@ -282,6 +298,36 @@ test("planner rerenders preserve focus and selection across multi-character inpu
     assert.equal(replacement.selectionStart, value.length);
     assert.equal(replacement.selectionEnd, value.length);
   }
+});
+
+test("rejected planner edits rerender the authoritative field value", () => {
+  const document = new FakeEventTarget();
+  document.activeElement = null;
+  const root = new ReplacingPlanRoot(document);
+  const toggle = new FakeEventTarget(document);
+  const status = new FakeEventTarget(document);
+  const snapshot = {
+    preview: { id: "preview-1", title: "Stable route", audience: "general", durationMinutes: 30, notes: "", targets: [] },
+    plan: null,
+    tour: { active: false, currentIndex: -1 },
+  };
+  const actions = {
+    updatePlan() {
+      return { ok: false, error: { code: "INVALID_INPUT", message: "title is required" } };
+    },
+  };
+  const ui = mountPlanUi({ root, toggle, status, actions, getSnapshot: () => snapshot });
+  ui.render();
+  const field = root.querySelector('[data-field="title"]');
+  field.focus();
+  field.value = "";
+
+  root.dispatch("input", { target: field });
+
+  const replacement = root.querySelector('[data-field="title"]');
+  assert.equal(replacement.value, "Stable route");
+  assert.equal(document.activeElement, replacement);
+  assert.equal(status.textContent, "title is required");
 });
 
 test("edit action delegates through updatePlan and renders the resulting preview", () => {

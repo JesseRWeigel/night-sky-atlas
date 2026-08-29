@@ -1,7 +1,7 @@
 # Night Sky Atlas — Plan the Sky Together
 
 [![MIT License](https://img.shields.io/badge/license-MIT-67c9ff.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-71%20passing-61f2da.svg)](#run-locally)
+[![Tests](https://img.shields.io/badge/tests-80%20passing-61f2da.svg)](#run-locally)
 [![WebXR](https://img.shields.io/badge/Meta%20Quest-WebXR-8bd9ff.svg)](#meta-quest-and-webxr)
 
 **[Open the live planetarium](https://jesserweigel.github.io/night-sky-atlas/)**
@@ -30,7 +30,7 @@ person using the site.
 3. Save the plan, then start the tour to frame targets and advance the
    observer time one slot at a time.
 
-The current observer, sky settings, and plan are stored locally in the browser.
+The observer location and saved observing plan are stored locally in the browser.
 Clearing site data removes that local state. A plan may propose a different
 location, but the agent preview deliberately does not change the current
 location or time.
@@ -92,7 +92,7 @@ npm run check
 ```
 
 `npm run check` performs syntax checks and runs the test suite. There is no
-separate linter or build step. The final documented suite is **71 tests
+separate linter or build step. The final documented suite is **80 tests
 passing** on Node 18.19.1.
 
 Opening `index.html` directly is not supported because browsers restrict ES

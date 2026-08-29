@@ -96,6 +96,51 @@ function normalizeDraft(draft) {
   };
 }
 
+export function restoreSavedPlan(state, storedPlan) {
+  if (!storedPlan) return null;
+  try {
+    const plan = structuredClone(storedPlan);
+    if (plan.status !== "saved") throw invalidInput("restored plan must be saved");
+    validateObservingPlan(plan, buildCatalogAt(plan.context.date));
+
+    const active = plan.currentIndex >= 0;
+    let targetDate = null;
+    let target = null;
+    let horizontal = null;
+    const locationMatches = Math.abs(plan.context.latitude - state.latitude) <= 0.0001 &&
+      Math.abs(plan.context.longitude - state.longitude) <= 0.0001;
+    if (active && locationMatches) {
+      const targetSlot = plan.targets[plan.currentIndex];
+      targetDate = new Date(targetSlot.scheduledTime);
+      const catalog = buildCatalogAt(targetDate.toISOString());
+      target = catalog.find((candidate) => candidate.id === targetSlot.targetId);
+      if (!target) throw new AppError("TARGET_NOT_FOUND", "Target was not found", { targetId: targetSlot.targetId });
+      horizontal = getTargetAtContext(target.id, { ...plan.context, date: targetDate.toISOString() }, catalog);
+    }
+
+    state.plan = plan;
+    state.tour = { active, currentIndex: plan.currentIndex };
+    if (active) state.planPanelOpen = true;
+    if (target) {
+      state.date = targetDate;
+      state.playing = false;
+      if ("lastCatalogUpdate" in state) state.lastCatalogUpdate = 0;
+      state.selected = target;
+      if (state.fov < 28 && state.survey !== "off") {
+        state.centerRa = target.ra;
+        state.centerDec = clamp(target.dec, -89.5, 89.5);
+      } else {
+        state.centerAz = horizontal.azimuth;
+        state.centerAlt = horizontal.altitude;
+      }
+    }
+    return state.plan;
+  } catch (error) {
+    if (error instanceof AppError) return null;
+    throw error;
+  }
+}
+
 export function createAppActions({
   state,
   storage,
@@ -524,6 +569,18 @@ export function createAppActions({
     }));
     const nextPlan = { ...plan, targets, currentIndex: targetIndex, updatedAt: now() };
     validateObservingPlan(nextPlan, catalog);
+    let persisted = true;
+    let warning;
+    try {
+      persistPlan(storage, nextPlan);
+    } catch (error) {
+      if (!(error instanceof AppError) || error.code !== "PERSISTENCE_UNAVAILABLE") throw error;
+      persisted = false;
+      warning = {
+        code: error.code,
+        message: "Tour progress is active for this page but could not be stored.",
+      };
+    }
     state.plan = nextPlan;
     state.tour = { active: true, currentIndex: targetIndex };
     state.date = targetDate;
@@ -538,8 +595,17 @@ export function createAppActions({
       state.centerAlt = horizontal.altitude;
     }
     state.planPanelOpen = true;
-    emit("tour-advanced", `Tour moved to ${target.name}, target ${targetIndex + 1} of ${targets.length}`, { targetId: target.id, targetIndex });
-    return { tour: state.tour, target: { id: target.id, name: target.name }, time: targetDate.toISOString(), altitude: horizontal.altitude };
+    const message = `Tour moved to ${target.name}, target ${targetIndex + 1} of ${targets.length}` +
+      (persisted ? "" : "; progress is active for this page but could not be stored");
+    emit("tour-advanced", message, { targetId: target.id, targetIndex, persisted });
+    return {
+      tour: state.tour,
+      target: { id: target.id, name: target.name },
+      time: targetDate.toISOString(),
+      altitude: horizontal.altitude,
+      persisted,
+      ...(warning ? { warning } : {}),
+    };
   };
 
   return {

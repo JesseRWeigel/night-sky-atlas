@@ -191,6 +191,9 @@ function normalizePlanRequest(request) {
       new Set(request.targetIds).size !== request.targetIds.length) {
     throw invalidInput("targetIds must contain one to twelve unique IDs");
   }
+  if (request.targetIds.length > durationMinutes) {
+    throw invalidInput("durationMinutes must provide at least one minute for every target");
+  }
   const minAltitude = requireNumberInRange(request.minAltitude, "minAltitude", 0, 90);
   const context = normalizeContext(request.context);
   const now = parseIsoDate(request.now, "now").toISOString();
@@ -225,6 +228,9 @@ export function previewObservingPlan(catalog, request) {
   const objects = normalizedRequest.targetIds.map((targetId) => {
     const object = catalog.find((candidate) => candidate.id === targetId);
     if (!object) throw new AppError("TARGET_NOT_FOUND", "Target was not found", { targetId });
+    if (!targetCategory(object)) {
+      throw invalidInput("targetIds must identify targets in an observable category", { targetId });
+    }
     return object;
   });
   const categoryCounts = Object.fromEntries(OBSERVABLE_CATEGORIES.map((category) => [category, 0]));
@@ -284,7 +290,7 @@ export function previewObservingPlan(catalog, request) {
   if (violations.length > 0) {
     throw new AppError("PLAN_CONSTRAINT_FAILED", "Plan constraints could not be satisfied", { violations });
   }
-  return {
+  const preview = {
     version: 1,
     id: normalizedRequest.id,
     title: normalizedRequest.title,
@@ -299,6 +305,7 @@ export function previewObservingPlan(catalog, request) {
     updatedAt: normalizedRequest.now,
     targets,
   };
+  return validateObservingPlan(preview, catalog);
 }
 
 export function validateObservingPlan(plan, catalog) {
@@ -315,7 +322,7 @@ export function validateObservingPlan(plan, catalog) {
     throw invalidInput("plan.durationMinutes must be an integer between 10 and 180");
   }
   normalizeCategoryRequirements(plan.categoryRequirements);
-  normalizeContext(plan.context);
+  const normalizedContext = normalizeContext(plan.context);
   if (!['preview', 'saved'].includes(plan.status)) throw invalidInput("plan.status must be preview or saved");
   parseIsoDate(plan.createdAt, "plan.createdAt");
   parseIsoDate(plan.updatedAt, "plan.updatedAt");
@@ -328,7 +335,9 @@ export function validateObservingPlan(plan, catalog) {
   const targetIds = new Set();
   const categoryCounts = Object.fromEntries(OBSERVABLE_CATEGORIES.map((category) => [category, 0]));
   let durationTotal = 0;
-  for (const target of plan.targets) {
+  const baseDuration = Math.floor(plan.durationMinutes / plan.targets.length);
+  const remainder = plan.durationMinutes % plan.targets.length;
+  for (const [index, target] of plan.targets.entries()) {
     if (!target || typeof target !== "object" || typeof target.targetId !== "string" || targetIds.has(target.targetId)) {
       throw invalidInput("plan targets must have unique IDs");
     }
@@ -338,16 +347,27 @@ export function validateObservingPlan(plan, catalog) {
       throw new AppError("TARGET_NOT_FOUND", "Target was not found", { targetId: target.targetId });
     }
     const category = targetCategory(object);
-    if (category) categoryCounts[category] += 1;
-    if (typeof target.name !== "string" || !OBSERVABLE_CATEGORIES.includes(target.category) ||
-        !Number.isInteger(target.startOffsetMinutes) || target.startOffsetMinutes < 0 ||
-        !Number.isInteger(target.durationMinutes) || target.durationMinutes < 1 ||
+    if (!category || target.category !== category) {
+      throw invalidInput("plan target category does not match the catalog");
+    }
+    categoryCounts[category] += 1;
+    const expectedDuration = baseDuration + (index < remainder ? 1 : 0);
+    const expectedStatus = plan.currentIndex < 0
+      ? "upcoming"
+      : index < plan.currentIndex ? "complete" : index === plan.currentIndex ? "current" : "upcoming";
+    if (typeof target.name !== "string" || target.name.trim() === "" ||
+        target.startOffsetMinutes !== durationTotal ||
+        target.durationMinutes !== expectedDuration || target.durationMinutes < 1 ||
         !Number.isFinite(target.altitude) || !Number.isFinite(target.azimuth) ||
         !Number.isFinite(target.minimumAltitude) ||
-        !["upcoming", "current", "complete"].includes(target.status)) {
+        target.status !== expectedStatus) {
       throw invalidInput("plan target has an invalid structural shape");
     }
-    parseIsoDate(target.scheduledTime, "target.scheduledTime");
+    const scheduledTime = parseIsoDate(target.scheduledTime, "target.scheduledTime");
+    const expectedTime = new Date(new Date(normalizedContext.date).getTime() + durationTotal * 60000);
+    if (scheduledTime.getTime() !== expectedTime.getTime()) {
+      throw invalidInput("target.scheduledTime must match its start offset");
+    }
     durationTotal += target.durationMinutes;
   }
   if (durationTotal !== plan.durationMinutes) throw invalidInput("target durations must equal plan.durationMinutes");
