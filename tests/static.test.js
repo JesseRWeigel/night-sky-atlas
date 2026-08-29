@@ -42,3 +42,21 @@ test("mobile planner form controls meet the 40px touch-target floor", async () =
     /@media \(max-width: 760px\)[\s\S]*?\.plan-form input,\s*\.plan-form select\s*\{[\s\S]*?min-height:\s*40px/,
   );
 });
+
+test("submission documentation names the baseline, tools, demo, and license audit", async () => {
+  const files = await Promise.all([
+    "../README.md",
+    "../docs/submission/devpost.md",
+    "../docs/submission/demo.md",
+    "../docs/submission/checklist.md",
+    "../docs/submission/attribution.md",
+  ].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
+  const combined = files.join("\n");
+  assert.match(combined, /81672ede79762cbf3aadfe23a8dc9eee32013f94/);
+  assert.match(combined, /get_sky_context/);
+  assert.match(combined, /preview_observing_plan/);
+  assert.match(combined, /WebMCP Leverage/);
+  assert.match(combined, /under three minutes|less than three minutes/i);
+  assert.match(combined, /MIT License/);
+  assert.match(combined, /September 3, 2026.*1:00 PM PDT/i);
+});
