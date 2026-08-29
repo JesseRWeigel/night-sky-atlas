@@ -1,7 +1,7 @@
 # Night Sky Atlas — Plan the Sky Together
 
 [![MIT License](https://img.shields.io/badge/license-MIT-67c9ff.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-66%20passing-61f2da.svg)](#run-locally)
+[![Tests](https://img.shields.io/badge/tests-70%20passing-61f2da.svg)](#run-locally)
 [![WebXR](https://img.shields.io/badge/Meta%20Quest-WebXR-8bd9ff.svg)](#meta-quest-and-webxr)
 
 **[Open the live planetarium](https://jesserweigel.github.io/night-sky-atlas/)**
@@ -92,7 +92,7 @@ npm run check
 ```
 
 `npm run check` performs syntax checks and runs the test suite. There is no
-separate linter or build step. The final documented suite is **66 tests
+separate linter or build step. The final documented suite is **70 tests
 passing** on Node 18.19.1.
 
 Opening `index.html` directly is not supported because browsers restrict ES

@@ -35,6 +35,14 @@ test("location control sync updates the observing-site preset", async () => {
   );
 });
 
+test("Add to plan relies on the shared change effect so duplicate focus survives", async () => {
+  const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
+  assert.doesNotMatch(
+    app,
+    /actions\.addTargetToPlan\(state\.selected\.id\);\s*(?:setPlanPanelOpen|planUi\.render)/,
+  );
+});
+
 test("mobile planner form controls meet the 40px touch-target floor", async () => {
   const css = await readFile(new URL("../plan.css", import.meta.url), "utf8");
   assert.match(

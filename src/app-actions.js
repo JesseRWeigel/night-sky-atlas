@@ -342,6 +342,7 @@ export function createAppActions({
         state.plan = saved;
         state.planPreview = null;
         state.planPanelOpen = true;
+        state.tour = { active: false, currentIndex: -1 };
         emit("plan-save-memory-only", "Plan is active for this page but could not be stored", { planId: saved.id });
       }
       throw error;
@@ -349,6 +350,7 @@ export function createAppActions({
     state.plan = saved;
     state.planPreview = null;
     state.planPanelOpen = true;
+    state.tour = { active: false, currentIndex: -1 };
     emit("plan-saved", `Saved plan ${saved.title}`, { planId: saved.id });
     return { plan: saved };
   };

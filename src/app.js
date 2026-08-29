@@ -31,7 +31,7 @@ const surveySpinner = surveyBadge.querySelector(".spinner");
 const dateTimeInput = $("#dateTimeInput");
 const speedSelect = $("#speedSelect");
 const inspector = $("#inspector");
-let planUi = { render() {}, announce() {} };
+let planUi = { render() {}, focusTarget() {}, announce() {} };
 
 const state = {
   date: new Date(),
@@ -895,6 +895,7 @@ function onStateChanged(change) {
     planUi.render();
     updatePlanCount();
     setPlanPanelOpen(true);
+    if (change.type === "plan-target-duplicate") planUi.focusTarget(change.targetId);
   }
   planUi.announce(change.message);
 }
@@ -965,6 +966,26 @@ function closeMenus(except = null) {
     button?.setAttribute("aria-expanded", "false");
   }
   $("#searchResults").hidden = true;
+}
+
+function closeTopmostOverlay() {
+  if (inspector.classList.contains("open")) {
+    closeInspector();
+    $("#tonightToggle").focus();
+    return true;
+  }
+  if (!$("#searchResults").hidden) {
+    closeMenus();
+    $("#searchInput").focus();
+    return true;
+  }
+  for (const [panel, button] of [[$("#layersPanel"), $("#layersToggle")], [$("#locationPanel"), $("#locationToggle")], [$("#aboutPanel"), $("#aboutToggle")]]) {
+    if (panel.hidden) continue;
+    closeMenus();
+    button.focus();
+    return true;
+  }
+  return false;
 }
 
 function togglePanel(panel, button) {
@@ -1083,8 +1104,6 @@ function bindControls() {
   $("#addObjectToPlan").addEventListener("click", () => runUiAction(() => {
     if (!state.selected) return;
     actions.addTargetToPlan(state.selected.id);
-    setPlanPanelOpen(true);
-    planUi.render();
   }));
 
   $("#planToggle").addEventListener("click", () => {
@@ -1139,6 +1158,10 @@ function bindControls() {
   canvas.addEventListener("pointercancel", () => { state.dragging = null; });
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && closeTopmostOverlay()) {
+      event.preventDefault();
+      return;
+    }
     if (event.key === "/" && !event.ctrlKey && !event.metaKey) { event.preventDefault(); $("#searchInput").focus(); }
     if (event.target.matches("input, select")) return;
     if (event.key === " ") { event.preventDefault(); $("#playToggle").click(); }
@@ -1188,6 +1211,7 @@ function init() {
     actions: plannerActions,
     getSnapshot: () => ({ preview: state.planPreview, plan: state.plan, tour: state.tour }),
     onClose: () => setPlanPanelOpen(false),
+    shouldCloseOnEscape: () => !inspector.classList.contains("open"),
   });
   bindControls();
   planUi.render();

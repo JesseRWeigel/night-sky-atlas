@@ -68,7 +68,7 @@ function renderTargets(targets = [], mode) {
       const targetName = mode === "tour"
         ? `<button type="button" class="plan-target-name" data-action="go-target" data-index="${index}" aria-label="Go to ${name}">${name}</button>`
         : `<strong class="plan-target-name">${name}</strong>`;
-      return `<li class="plan-target plan-target-${status}" data-target-id="${targetId}">
+      return `<li class="plan-target plan-target-${status}" data-target-id="${targetId}" tabindex="-1">
         <span class="plan-node" aria-hidden="true"></span>
         <div class="plan-target-copy">
           <span class="plan-target-status">${statusText}</span>
@@ -159,7 +159,16 @@ export function renderPlanMarkup(snapshot = {}) {
   return renderEmpty();
 }
 
-export function mountPlanUi({ root, toggle, closeButton, status, actions, getSnapshot, onClose = () => {} }) {
+export function mountPlanUi({
+  root,
+  toggle,
+  closeButton,
+  status,
+  actions,
+  getSnapshot,
+  onClose = () => {},
+  shouldCloseOnEscape = () => true,
+}) {
   const render = () => {
     const active = root.ownerDocument.activeElement;
     const activeField = active && root.contains(active) ? active.dataset.field : null;
@@ -229,11 +238,20 @@ export function mountPlanUi({ root, toggle, closeButton, status, actions, getSna
     }, 0);
   });
   root.ownerDocument.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") close();
+    if (event.key !== "Escape" || toggle.getAttribute("aria-expanded") !== "true" || !shouldCloseOnEscape()) return;
+    event.preventDefault?.();
+    event.stopImmediatePropagation?.();
+    close();
   });
 
   return {
     render,
+    focusTarget(targetId) {
+      const target = [...root.querySelectorAll(".plan-target[data-target-id]")]
+        .find((item) => item.dataset.targetId === targetId);
+      target?.focus();
+      return Boolean(target);
+    },
     announce(message) {
       status.textContent = message;
     },

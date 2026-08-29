@@ -43,6 +43,32 @@ test("agent preview shows proposed context and constellation-thread targets", ()
   assert.match(html, /Save this plan/);
 });
 
+test("preview target nodes can receive duplicate-target focus", () => {
+  const html = renderPlanMarkup({
+    preview: {
+      id: "preview-1",
+      source: "manual",
+      title: "Route",
+      audience: "general",
+      durationMinutes: 10,
+      minAltitude: 0,
+      context: { date: "2026-08-29T01:00:00.000Z", latitude: 0, longitude: 0 },
+      targets: [{
+        targetId: "star-vega",
+        name: "Vega",
+        category: "bright_star",
+        scheduledTime: "2026-08-29T01:00:00.000Z",
+        minimumAltitude: 40,
+        status: "upcoming",
+      }],
+    },
+    plan: null,
+    tour: { active: false, currentIndex: -1 },
+  });
+
+  assert.match(html, /<li[^>]*data-target-id="star-vega"[^>]*tabindex="-1"/);
+});
+
 test("tour markup exposes textual progress and previous-next controls", () => {
   const html = renderPlanMarkup({
     preview: null,
@@ -329,6 +355,34 @@ test("mounted planner focuses its heading after click activation and returns foc
   toggle.setAttribute("aria-expanded", "false");
   document.dispatch("keydown", { key: "Escape" });
   assert.equal(closeCount, 1);
+});
+
+test("mounted planner yields Escape while a higher-priority surface is open", () => {
+  let closeCount = 0;
+  let shouldCloseOnEscape = false;
+  const document = new FakeEventTarget();
+  const root = new FakeEventTarget(document);
+  const toggle = new FakeEventTarget(document);
+  const status = new FakeEventTarget(document);
+  toggle.setAttribute("aria-expanded", "true");
+  mountPlanUi({
+    root,
+    toggle,
+    status,
+    actions: {},
+    getSnapshot: () => ({ plan: null, preview: null, tour: { active: false, currentIndex: -1 } }),
+    onClose: () => { closeCount += 1; },
+    shouldCloseOnEscape: () => shouldCloseOnEscape,
+  });
+
+  document.dispatch("keydown", { key: "Escape" });
+  assert.equal(closeCount, 0);
+  assert.equal(toggle.focusCount, 0);
+
+  shouldCloseOnEscape = true;
+  document.dispatch("keydown", { key: "Escape" });
+  assert.equal(closeCount, 1);
+  assert.equal(toggle.focusCount, 1);
 });
 
 test("mounted planner close control returns focus to the Plan toggle", () => {

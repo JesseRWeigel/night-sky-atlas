@@ -175,6 +175,29 @@ test("preview and save preserve observer context until an explicit observer acti
   assert.equal(saved.plan.id, "plan-fixed");
 });
 
+test("saving a replacement preview resets stale tour progress", () => {
+  const { actions, state } = harness();
+  actions.createManualPlan({ title: "First route", audience: "general", durationMinutes: 10 });
+  actions.addTargetToPlan("star-vega");
+  actions.savePlan({ previewId: state.planPreview.id });
+  actions.advanceTour({ direction: "start" });
+  assert.deepEqual(state.tour, { active: true, currentIndex: 0 });
+
+  const replacement = actions.previewPlan({
+    title: "Replacement route",
+    audience: "general",
+    durationMinutes: 10,
+    targetIds: ["star-vega"],
+    categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+    minAltitude: 0,
+  });
+  actions.savePlan({ previewId: replacement.preview.id });
+
+  assert.deepEqual(state.tour, { active: false, currentIndex: -1 });
+  assert.equal(state.plan.currentIndex, -1);
+  assert.deepEqual(state.plan.targets.map((target) => target.status), ["upcoming"]);
+});
+
 test("tour rejects location mismatch before mutating progress", () => {
   const { actions, state } = harness();
   actions.createManualPlan({ title: "Manual", audience: "general", durationMinutes: 10 });
