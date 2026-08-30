@@ -51,12 +51,16 @@ test("mobile planner form controls meet the 40px touch-target floor", async () =
   );
 });
 
-test("mobile header keeps the Tonight drawer available", async () => {
-  const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
+test("mobile header keeps the Tonight drawer available and named", async () => {
+  const [css, html] = await Promise.all([
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+  ]);
   assert.match(
     css,
     /@media \(max-width: 760px\)[\s\S]*?\.header-actions \.tonight-button\s*\{\s*display:\s*flex;/,
   );
+  assert.match(html, /<button id="tonightToggle"[^>]*aria-label="Tonight"/);
 });
 
 test("submission documentation names the baseline, tools, demo, and license audit", async () => {
