@@ -16,34 +16,36 @@ unique and substantially different.
   audit are prepared in `docs/submission/`.
 - [x] Demo script is timed for 0:00–2:50, includes audio narration and the
   preview-before-location-mutation evidence.
-- [x] The supplied Node check command is recorded in the README; final run
-  output and test count must be confirmed immediately before submission.
+- [x] The supplied Node check command is recorded in the README; the final
+  local run passes all 81 tests.
+- [x] Six genuine deployment screenshots are captured in
+  `docs/submission/screenshots/`, including the 390 × 844 mobile planner.
 
 ## Owner actions before submitting
 
 - [ ] Confirm eligibility, create/sign in to Devpost, join the WebMCP
   Challenge, and read/accept all required attestations and Official Rules.
-- [ ] Push the intended commit to the public repository with GitHub
+- [x] Push the intended commit to the public repository with GitHub
   authentication. Confirm the repository shows the `LICENSE` file and that the
   MIT License is visible/detectable at the top of the repository page.
-- [ ] Publish or verify the GitHub Pages live URL:
-  <https://jesserweigel.github.io/night-sky-atlas/>. Do not claim publication
-  from this local preparation alone.
-- [ ] Open the published URL in a logged-in ChatGPT desktop built-in browser;
+- [x] Publish and verify the GitHub Pages live URL:
+  <https://jesserweigel.github.io/night-sky-atlas/>.
+- [x] Open the published URL in a logged-in ChatGPT desktop built-in browser;
   use GPT-5.6 Sol or Terra, enable Site tools, inspect Available site tools,
-  and run the final preview-first prompt. This has not been performed by this
-  documentation task.
+  and run the final preview-first prompt. The live run exposed all ten tools,
+  previewed and saved a three-target route, advanced it to target 2 of 3, and
+  restored that progress after reload with no browser errors.
 - [ ] Record the final demo with audio using `demo.md`, ensure it is a public
   YouTube video **under three minutes**, and verify it uses no copyrighted
   music or other third-party material without permission.
-- [ ] Upload the seven planned screenshots and enter the prepared title,
-  tagline, description, live URL, public repository URL, and public YouTube
-  URL in Devpost.
+- [ ] Capture the seventh planned screenshot manually from the desktop app's
+  **Available site tools** menu. Upload all seven screenshots and enter the
+  prepared title, tagline, description, live URL, public repository URL, and
+  public YouTube URL in Devpost.
 - [ ] Verify the submitted text explains the WebMCP fit, better user
   experience, shared human-agent work, and implementation; verify all links
   load for a signed-out judge.
-- [ ] Run `npm run check` one final time and reconcile the README badge/count
-  if necessary.
+- [x] Run `npm run check` one final time and reconcile the README badge/count.
 - [ ] Give final publication approval, submit before the deadline, and save a
   receipt/screenshot of the submitted Devpost entry.
 

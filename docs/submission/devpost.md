@@ -52,8 +52,9 @@ API key is required.
   write tools, including `get_sky_context` and `advance_observing_tour`.
 - A manual planner that remains useful without an agent, plus a saved guided
   tour that frames targets and advances time.
-- Browser verification of the full New York example: Mars, Mirfak, and the
-  Pleiades each stayed above 25° throughout their assigned ten-minute slot.
+- Browser verification of the fixed-time New York demo example: Mars, Mirfak,
+  and the Pleiades each stayed above 25° throughout their assigned ten-minute
+  slot.
 
 ## What we learned
 
@@ -76,7 +77,7 @@ change understandable instead of surprising.
 | Criterion | Evidence |
 | --- | --- |
 | WebMCP Leverage | Ten top-level, strict-schema `document.modelContext` tools reuse real app actions: three read-only queries and seven writes. The demo shows read → find → preview before location/time mutation, then save and tour advancement. |
-| Execution | The static atlas works manually and through WebMCP. It has local persistence, an accessible planner rail, responsive mobile behavior, source credits, and 80 passing Node tests. |
+| Execution | The static atlas works manually and through WebMCP. It has local persistence, an accessible planner rail, responsive mobile behavior, source credits, and 81 passing Node tests. |
 | Potential Impact | Beginners and families can turn “what can we see tonight?” into an understandable, altitude-constrained route without surrendering control of their place, time, or plan. |
 | Creativity & Ambition | It turns an existing visual planetarium into a shared human-agent planning surface: the agent proposes an itinerary inside the sky interface, and the person reviews the same visible state before committing it. |
 

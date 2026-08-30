@@ -1,7 +1,7 @@
 # Night Sky Atlas — Plan the Sky Together
 
 [![MIT License](https://img.shields.io/badge/license-MIT-67c9ff.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-80%20passing-61f2da.svg)](#run-locally)
+[![Tests](https://img.shields.io/badge/tests-81%20passing-61f2da.svg)](#run-locally)
 [![WebXR](https://img.shields.io/badge/Meta%20Quest-WebXR-8bd9ff.svg)](#meta-quest-and-webxr)
 
 **[Open the live planetarium](https://jesserweigel.github.io/night-sky-atlas/)**
