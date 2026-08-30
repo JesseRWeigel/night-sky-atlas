@@ -475,3 +475,26 @@ test("preview rejects a null observer with typed atomic validation", () => {
   assert.deepEqual(state, snapshot);
   assert.deepEqual(changes, []);
 });
+
+test("preview rejects observer names that persistence cannot store", () => {
+  const { actions, state, changes } = harness();
+  const snapshot = structuredClone(state);
+  assert.throws(
+    () => actions.previewPlan({
+      title: "Unsaveable observer",
+      audience: "general",
+      durationMinutes: 10,
+      targetIds: ["star-vega"],
+      categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+      minAltitude: 0,
+      observer: {
+        latitude: 40.7128,
+        longitude: -74.006,
+        locationName: "L".repeat(81),
+      },
+    }),
+    (error) => error.code === "INVALID_INPUT",
+  );
+  assert.deepEqual(state, snapshot);
+  assert.deepEqual(changes, []);
+});

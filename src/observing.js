@@ -20,18 +20,21 @@ function normalizeContext(context) {
     throw invalidInput("context must be an object");
   }
   const date = parseIsoDate(context.date, "context.date");
-  const { latitude, longitude } = context;
+  const { latitude, longitude, locationName } = context;
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
     throw invalidInput("context.latitude must be between -90 and 90");
   }
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     throw invalidInput("context.longitude must be between -180 and 180");
   }
+  if (locationName !== undefined && (typeof locationName !== "string" || locationName.length > 80)) {
+    throw invalidInput("context.locationName must contain at most 80 characters");
+  }
   return {
     date: date.toISOString(),
     latitude,
     longitude,
-    ...(typeof context.locationName === "string" ? { locationName: context.locationName } : {}),
+    ...(locationName === undefined ? {} : { locationName }),
   };
 }
 

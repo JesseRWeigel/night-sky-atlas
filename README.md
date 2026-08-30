@@ -92,7 +92,7 @@ npm run check
 ```
 
 `npm run check` performs syntax checks and runs the test suite. There is no
-separate linter or build step. The final documented suite is **80 tests
+separate linter or build step. The final documented suite is **81 tests
 passing** on Node 18.19.1.
 
 Opening `index.html` directly is not supported because browsers restrict ES
