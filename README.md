@@ -193,3 +193,15 @@ test when changing coordinate or projection math.
 ## License
 
 Code is released under the permissive [MIT License](LICENSE).
+
+## Keyboard accessibility
+
+Focus the sky canvas to navigate with arrows, zoom with + / -, or pause/resume time with Space. Slash focuses object search outside interactive controls. Shortcuts do not intercept typing, native button activation, modifier chords, or IME input. The mobile location control retains its full accessible name.
+
+### Accessibility verification (2026-11-12)
+
+- 85 Node tests pass; all source files pass syntax checks. CI runs `npm run check`.
+- Real Chrome interaction: reproduced Space on Plan incorrectly pausing time; verified it now opens Plan. Verified Space and slash stay in Notes without changing playback, and canvas Space/search shortcuts still work.
+- At 390 x 844, no horizontal document overflow; plan panel fits viewport and the location button is named `Observer location: New York City` rather than only a symbol.
+- Existing a11y-sweep, using installed Chrome in an isolated profile, light/dark and reduced-motion passes: 56 failing findings before the label/contrast changes, 44 afterward; zero execution/page errors. The 12 removed findings cover the brand accessible-name mismatch and Tonight list text contrast. These are repeated findings across contexts, not 12 independent bugs.
+- Not a claim of WCAG conformance. Remaining scanner reports (control boundary contrast, native date input focus/trap heuristic, reduced-motion animation) need separate manual triage. The audit did not change hosting or live saved plans.

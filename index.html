@@ -15,7 +15,7 @@
       <header class="topbar">
         <a class="brand" href="#" aria-label="Night Sky Atlas home">
           <span class="brand-mark" aria-hidden="true"><i></i></span>
-          <span><strong>Night Sky</strong><small>ATLAS</small></span>
+          <span><strong>Night Sky</strong> <small>ATLAS</small></span>
         </a>
 
         <div class="search-wrap">
@@ -38,7 +38,7 @@
           <button id="tonightToggle" class="chip-button tonight-button" aria-label="Tonight" aria-expanded="false" aria-controls="inspector">
             <span class="tonight-spark" aria-hidden="true">✦</span><span>Tonight</span>
           </button>
-          <button id="locationToggle" class="chip-button" aria-expanded="false" aria-controls="locationPanel">
+          <button id="locationToggle" aria-label="Observer location: New York City" class="chip-button" aria-expanded="false" aria-controls="locationPanel">
             <span class="status-dot"></span><span id="locationName">New York City</span><span aria-hidden="true">⌄</span>
           </button>
           <button id="aboutToggle" class="icon-button" aria-label="About and data sources">i</button>
@@ -49,7 +49,7 @@
         <section id="skyStage" class="sky-stage" aria-label="Interactive sky view">
           <img id="surveyImage" class="survey-image" alt="Astronomical sky survey at the current coordinates" />
           <div id="surveyEmpty" class="survey-empty" aria-hidden="true"></div>
-          <canvas id="skyCanvas" tabindex="0" aria-label="Planetarium. Drag to look around, scroll to zoom, and click celestial objects for details."></canvas>
+          <canvas id="skyCanvas" tabindex="0" aria-label="Planetarium. Drag to look around, scroll to zoom, and click celestial objects for details. When focused, use arrow keys to look around, plus and minus to zoom, and Space to pause or resume time. Press slash to search for objects."></canvas>
 
           <div class="view-readout" aria-live="polite">
             <div><span id="viewMode">LOCAL SKY</span><strong id="viewDirection">Zenith · 180° field</strong></div>

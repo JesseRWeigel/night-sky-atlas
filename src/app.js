@@ -1,3 +1,4 @@
+import { skyShortcut } from "./keyboard.js";
 import {
   angularSeparation,
   clamp,
@@ -831,6 +832,7 @@ function syncLocationControls() {
   $("#latitudeInput").value = state.latitude.toFixed(4);
   $("#longitudeInput").value = state.longitude.toFixed(4);
   $("#locationName").textContent = state.locationName;
+  $("#locationToggle").setAttribute("aria-label", `Observer location: ${state.locationName}`);
   const sitePreset = $("#sitePreset");
   const matchingPreset = [...sitePreset.options].find((option) => {
     const [latitude, longitude] = option.value.split(",");
@@ -1165,8 +1167,10 @@ function bindControls() {
   canvas.addEventListener("pointercancel", () => { state.dragging = null; });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "/" && !event.ctrlKey && !event.metaKey) { event.preventDefault(); $("#searchInput").focus(); }
-    if (event.target.matches("input, select")) return;
+    const shortcut = skyShortcut(event, canvas);
+    if (!shortcut) return;
+    event.preventDefault();
+    if (shortcut === "search") { $("#searchInput").focus(); return; }
     if (event.key === " ") { event.preventDefault(); $("#playToggle").click(); }
     if (event.key === "+" || event.key === "=") setFov(state.fov / 1.5);
     if (event.key === "-") setFov(state.fov * 1.5);
