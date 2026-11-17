@@ -76,3 +76,50 @@ test("angular separation is zero for identical coordinates and 90° for quadratu
   close(angularSeparation(12, -30, 12, -30), 0, 1e-6);
   close(angularSeparation(0, 0, 90, 0), 90, 1e-10);
 });
+
+// JPL Horizons observer table, geocentric apparent RA/Dec (quantity 2),
+// centers 500@399, DE441, sampled at the two UTC times below. A shared
+// half-degree regression ceiling catches sign/antipode failures without
+// requiring this educational approximation to reproduce Horizons precision.
+const horizons = [
+  ["2026-11-16T11:00:00Z", {
+    Sun: ["15 26 54.49", "-18 47 44.7"],
+    Mercury: ["14 16 48.53", "-11 14 05.0"],
+    Venus: ["13 23 22.55", "-09 57 51.1"],
+    Mars: ["09 55 36.83", "+14 41 20.4"],
+    Jupiter: ["09 53 39.78", "+13 35 06.1"],
+    Saturn: ["00 35 15.63", "+00 55 44.6"],
+    Neptune: ["00 08 52.57", "-00 34 19.0"],
+  }],
+  ["2027-02-09T00:00:00Z", {
+    Sun: ["21 29 36.73", "-14 48 53.8"],
+    Mercury: ["22 27 58.58", "-07 31 25.0"],
+    Venus: ["18 26 39.89", "-21 15 12.9"],
+    Mars: ["10 33 28.88", "+13 50 30.8"],
+    Jupiter: ["09 40 04.71", "+15 04 06.8"],
+    Saturn: ["00 44 02.46", "+02 13 04.8"],
+    Neptune: ["00 11 28.32", "-00 14 03.8"],
+  }],
+];
+
+function sexagesimal(text) {
+  const [degrees, minutes, seconds] = text.replace(/^[+-]/, "").split(" ").map(Number);
+  return (text.startsWith("-") ? -1 : 1) * (degrees + minutes / 60 + seconds / 3600);
+}
+
+for (const [time, reference] of horizons) {
+  test(`geocentric Sun and planet positions match approximate JPL Horizons directions at ${time}`, () => {
+    const objects = solarSystemPositions(new Date(time));
+    for (const [name, [ra, dec]] of Object.entries(reference)) {
+      const actual = objects.find((object) => object.name === name);
+      close(angularSeparation(actual.ra, actual.dec, 15 * sexagesimal(ra), sexagesimal(dec)), 0, 0.5, name);
+    }
+  });
+}
+
+test("Mars and Jupiter are closely paired on NASA's November 2026 skywatching date", () => {
+  const objects = solarSystemPositions(new Date("2026-11-16T11:00:00Z"));
+  const mars = objects.find((object) => object.name === "Mars");
+  const jupiter = objects.find((object) => object.name === "Jupiter");
+  close(angularSeparation(mars.ra, mars.dec, jupiter.ra, jupiter.dec), 1.2, 0.3, "Mars–Jupiter pairing");
+});
