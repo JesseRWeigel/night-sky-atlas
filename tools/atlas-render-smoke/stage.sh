@@ -20,6 +20,19 @@ done
 (cd "$work/patched"; git apply --check "$bundle/ephemeris-sign.patch"; git apply "$bundle/ephemeris-sign.patch")
 [[ "$(git hash-object "$work/patched/src/astronomy.js")" == "$post" ]]
 for name in baseline patched; do
+  python3 - "$work/$name/index.html" <<'PYHTML'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+html = p.read_text()
+tag = '<script type="module" src="src/app.js"></script>'
+if html.count(tag) != 1:
+    raise SystemExit("Expected exactly one Atlas app script tag")
+p.write_text(html.replace(tag,
+    '<pre id="atlas-render-evidence" hidden data-status="loading">The Atlas module has not scheduled a draw.</pre>\n'
+    '    <script src="src/atlas-test-diagnostics.js"></script>\n    ' + tag))
+PYHTML
+  cp "$bundle/diagnostics.js" "$work/$name/src/atlas-test-diagnostics.js"
   printf '\n' >> "$work/$name/src/app.js"
   cat "$bundle/browser-probe.mjs" >> "$work/$name/src/app.js"
   node --check "$work/$name/src/app.js"

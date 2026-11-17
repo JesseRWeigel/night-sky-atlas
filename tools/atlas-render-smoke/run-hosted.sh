@@ -3,7 +3,9 @@ set -euo pipefail
 bundle="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo="${1:?supply a checkout containing the exact baseline}"
 chrome="$(command -v google-chrome)"
+driver="$(command -v chromedriver)"
 "$chrome" --version
+"$driver" --version
 node --version
 python3 "$bundle/extract.py" --self-test
 node "$bundle/self-test.mjs"
@@ -23,21 +25,12 @@ for _ in {1..50}; do
 done
 port="$(cat "$root/port")"
 [[ "$port" =~ ^[0-9]+$ ]]
-for variant in baseline patched; do
-  # Keep the normal Chrome sandbox. Profiles and the HTTP server are local to this job.
-  if ! timeout 35s "$chrome" --headless --no-first-run --disable-background-networking \
-    --user-data-dir="$root/${variant}-profile" --window-size=1366,900 \
-    --force-device-scale-factor=1 --virtual-time-budget=5000 --dump-dom \
-    "http://127.0.0.1:$port/$variant/" > "$root/$variant.html" 2> "$root/$variant.chrome.log"; then
-    tail -40 "$root/$variant.chrome.log" >&2
-    exit 1
-  fi
-  if ! python3 "$bundle/extract.py" "$root/$variant.html" "$root/$variant.json"; then
-    tail -40 "$root/$variant.chrome.log" >&2
-    tail -40 "$root/server.log" >&2
-    exit 1
-  fi
-done
+if ! timeout 120s python3 "$bundle/poll-render.py" \
+  "$driver" "$chrome" "http://127.0.0.1:$port" "$root"; then
+  tail -40 "$root/driver.log" >&2
+  tail -40 "$root/server.log" >&2
+  exit 1
+fi
 node "$bundle/assert-render.mjs" "$root/baseline.json" "$root/patched.json"
 printf 'Baseline rendered evidence:\n'
 cat "$root/baseline.json"
