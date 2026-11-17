@@ -1,0 +1,22 @@
+name: Atlas rendered geometry smoke
+'on':
+  push:
+    branches: [codex/atlas-render-smoke-20261117-fafb5788]
+    paths:
+      - '.github/workflows/atlas-render-smoke.yml'
+      - 'tools/atlas-render-smoke/**'
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out the test branch and exact-base history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Measure baseline and patched canvas geometry in Chrome
+        shell: bash
+        run: bash tools/atlas-render-smoke/run-hosted.sh "$GITHUB_WORKSPACE"
