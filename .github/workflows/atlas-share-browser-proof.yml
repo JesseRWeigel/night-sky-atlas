@@ -1,0 +1,27 @@
+name: Atlas share and observer browser proof
+'on':
+  push:
+    branches: [codex/atlas-share-browser-proof-20261119]
+    paths:
+      - '.github/workflows/atlas-share-browser-proof.yml'
+      - 'tools/atlas-share-proof/**'
+permissions:
+  contents: read
+jobs:
+  portable-recipe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out proof branch and pinned release
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check exact payload and compare negative and fixed browser cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/tools/atlas-share-proof"
+          printf '%s  %s\n' c1eaab029fb0c3ded447e1722bf2811e15e16850b873dbceb0dc721426265c21 SHA256SUMS | sha256sum --check
+          sha256sum --check SHA256SUMS
+          bash run-browser.sh "$GITHUB_WORKSPACE"
