@@ -542,3 +542,9 @@ button.plan-target-name:hover {
     animation: none;
   }
 }
+
+#portablePlan { margin-top: 1rem; }
+#portablePlan summary { cursor: pointer; }
+#portablePlan .plan-form { margin: 0.75rem 0; }
+#portablePlan #portableOutputGroup[hidden] { display: none; }
+#portablePlan :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
