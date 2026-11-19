@@ -161,7 +161,26 @@
             <div><span class="panel-kicker">Observing route</span><h2 id="planRailTitle" tabindex="-1">Your sky plan</h2></div>
             <button id="closePlan" class="bare-button" aria-label="Close observing plan">×</button>
           </header>
-          <div id="planContent" class="plan-content"></div>
+          <div class="plan-content">
+            <div id="planContent"></div>
+            <details id="portablePlan" class="plan-state">
+              <summary>Share or preview a plan</summary>
+              <p>Share a saved plan’s start time and targets. Its name, notes and observing location stay private.</p>
+              <button type="button" class="plan-secondary-action" id="portableExport">Preview saved plan export</button>
+              <div id="portableOutputGroup" class="plan-form" hidden>
+                <p id="portableExportTime"></p>
+                <label for="portableOutput">Shareable JSON (copy manually)</label>
+                <textarea id="portableOutput" readonly rows="4"></textarea>
+              </div>
+              <div class="plan-form">
+                <label for="portableInput">Paste shared plan JSON</label>
+                <textarea id="portableInput" maxlength="4096" rows="4"></textarea>
+              </div>
+              <button type="button" class="plan-secondary-action" id="portableImport">Preview import</button>
+              <p id="portableResult" role="status"></p>
+              <ol id="portableTargets"></ol>
+            </details>
+          </div>
           <p id="planStatus" class="sr-only" aria-live="polite"></p>
         </aside>
 

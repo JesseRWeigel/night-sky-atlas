@@ -18,6 +18,7 @@ import { AppError } from "./app-error.js";
 import { createAppActions, restoreSavedPlan } from "./app-actions.js";
 import { CATALOG, CONSTELLATION_LINES, DEEP_SKY, SOLAR_SYSTEM_INFO, STARS } from "./catalog.js";
 import { loadPlan } from "./plan-store.js";
+import { mountPortablePlanUi } from "./portable-plan-ui.js";
 import { mountPlanUi, planChipPresentation } from "./plan-ui.js";
 import { setupWebMcp } from "./webmcp.js";
 
@@ -32,6 +33,7 @@ const surveySpinner = surveyBadge.querySelector(".spinner");
 const dateTimeInput = $("#dateTimeInput");
 const speedSelect = $("#speedSelect");
 const inspector = $("#inspector");
+let portablePlanUi = { close() {}, invalidateLocation() {} };
 let planUi = { render() {}, focusTarget() {}, announce() {} };
 
 const state = {
@@ -862,6 +864,7 @@ function updatePlanCount() {
 }
 
 function setPlanPanelOpen(open) {
+  if (!open) portablePlanUi.close();
   state.planPanelOpen = open;
   $("#planRail").classList.toggle("open", open);
   $("#planRail").setAttribute("aria-hidden", String(!open));
@@ -873,6 +876,7 @@ function onStateChanged(change) {
     state.lastCatalogUpdate = 0;
   }
   if (change.type === "observer-location") {
+    portablePlanUi.invalidateLocation();
     syncLocationControls();
     updateTimeUi();
   }
@@ -1219,6 +1223,15 @@ function init() {
     getSnapshot: () => ({ preview: state.planPreview, plan: state.plan, tour: state.tour }),
     onClose: () => setPlanPanelOpen(false),
     closeTopmostOverlay,
+  });
+  portablePlanUi = mountPortablePlanUi({
+    root: $("#portablePlan"),
+    getPlan: () => state.plan,
+    getLocation: () => ({
+      latitude: state.latitude,
+      longitude: state.longitude,
+      locationName: state.locationName,
+    }),
   });
   bindControls();
   planUi.render();
