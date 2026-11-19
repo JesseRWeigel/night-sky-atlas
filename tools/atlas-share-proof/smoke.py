@@ -289,13 +289,16 @@ def main(driver, chrome, base, stage, result_root, variant):
     require(re.fullmatch(r"http://127\.0\.0\.1:[0-9]+", base), "Only literal loopback is allowed")
     stage, root = Path(stage), Path(result_root)
     fixture = json.loads((stage / "smoke-fixture.json").read_text())
-    args = ["--headless", "--no-first-run", "--disable-background-networking", "--window-size=1366,900",
+    args = ["--headless=new", "--no-first-run", "--disable-background-networking", "--window-size=1200,800",
             "--user-data-dir=" + str(root / "profile")]
     with serve(driver, root / "driver.log") as url:
+        started = time.monotonic()
+        print(f"{variant}: requesting Chrome session with 40s startup limit", flush=True)
         session = command(url, "/session", {"capabilities":{"alwaysMatch":{
              "browserName":"chrome","pageLoadStrategy":"eager",
              "goog:chromeOptions":{"binary":chrome,"args":args},
-             "goog:loggingPrefs":{"performance":"ALL"}}}})
+             "goog:loggingPrefs":{"performance":"ALL"}}}}, timeout=40)
+        print(f"{variant}: Chrome session ready after {time.monotonic() - started:.2f}s", flush=True)
         sid = session["sessionId"]
         test = Smoke(url, sid, base, fixture)
         try:

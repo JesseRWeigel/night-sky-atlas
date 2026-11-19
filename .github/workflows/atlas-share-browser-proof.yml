@@ -22,6 +22,6 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/tools/atlas-share-proof"
-          printf '%s  %s\n' c1eaab029fb0c3ded447e1722bf2811e15e16850b873dbceb0dc721426265c21 SHA256SUMS | sha256sum --check
+          printf '%s  %s\n' 01acdc34b32336a728ed234a24b1be033e27f5f4b605fd124e32f8009b3ff1ba SHA256SUMS | sha256sum --check
           sha256sum --check SHA256SUMS
           bash run-browser.sh "$GITHUB_WORKSPACE"

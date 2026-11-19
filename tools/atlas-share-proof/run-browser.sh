@@ -35,7 +35,7 @@ for variant in negative fixed; do (
   [[ "$port" =~ ^[0-9]+$ ]]
   if ! timeout 110s python3 "$bundle/smoke.py" "$driver" "$chrome" "http://127.0.0.1:$port" "$stage" "$root" "$variant"; then
     echo "FAIL/INCOMPLETE $variant browser smoke" >&2
-    if [[ -f "$root/driver.log" ]]; then tail -30 "$root/driver.log" >&2; fi
+    if [[ -f "$root/driver.log" ]]; then tail -65 "$root/driver.log" >&2; fi
     exit 1
   fi
   printf 'Verified browser variant %s (%s):\n' "$variant" "$root"

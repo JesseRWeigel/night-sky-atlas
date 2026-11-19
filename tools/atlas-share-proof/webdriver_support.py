@@ -10,19 +10,21 @@ from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 
 opener = build_opener(ProxyHandler({}))
-def command(origin, path, data=None, method=None):
+def command(origin, path, data=None, method=None, *, timeout=12):
     req = Request(origin + path, data=None if data is None else json.dumps(data).encode(),
                   headers={"Content-Type":"application/json"}, method=method)
     try:
-        with opener.open(req, timeout=12) as res:
+        with opener.open(req, timeout=timeout) as res:
             reply = json.load(res)
     except HTTPError as err:
         raise RuntimeError(f"WebDriver {path}: {err.read().decode(errors='replace')[:1800]}") from err
+    except TimeoutError as err:
+        raise TimeoutError(f"WebDriver {req.get_method()} {path}: no reply within {timeout}s") from err
     return reply["value"]
 
 @contextmanager
 def serve(driver, log):
-    with log.open("w") as fd, subprocess.Popen([driver, "--port=0"], stdout=fd, stderr=fd) as proc:
+    with log.open("w") as fd, subprocess.Popen([driver, "--port=0", "--verbose"], stdout=fd, stderr=fd) as proc:
         try:
             for _ in range(70):
                 if proc.poll() is not None:
