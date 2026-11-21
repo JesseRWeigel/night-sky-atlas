@@ -205,3 +205,48 @@ test("persisted plans reject nonzero category quota mismatches", () => {
     (error) => error.code === "INVALID_INPUT",
   );
 });
+
+function planetPlan(context, targetId, minAltitude = 0) {
+  return previewObservingPlan(buildCatalogAt(context.date), {
+    previewId: "planet-slot",
+    title: "Planet slot",
+    audience: "general",
+    durationMinutes: 180,
+    targetIds: [targetId],
+    categoryRequirements: { planet: 1, bright_star: 0, deep_sky: 0 },
+    minAltitude,
+    context,
+    now: NYC.date,
+  });
+}
+
+function contextAtMinute(context, minutes) {
+  return { ...context, date: new Date(Date.parse(context.date) + minutes * 60000).toISOString() };
+}
+
+test("planet slot uses each sample's ephemeris for its displayed position and minimum altitude", () => {
+  const context = { ...NYC, date: "2026-08-29T19:00:00.000Z" };
+  const id = "planet-mercury";
+  const expected = [0, 90, 180].map((minute) => getTargetAtContext(id, contextAtMinute(context, minute)));
+  const [target] = planetPlan(context, id).targets;
+
+  assert.equal(target.altitude, expected[1].altitude);
+  assert.equal(target.azimuth, expected[1].azimuth);
+  assert.equal(target.minimumAltitude, Math.min(...expected.map((sample) => sample.altitude)));
+});
+
+test("planet altitude constraint does not accept a slot that goes below the threshold at its end", () => {
+  const context = { ...NYC, date: "2026-09-05T18:00:00.000Z" };
+  const id = "planet-venus";
+  const minAltitude = 31.35;
+  const end = getTargetAtContext(id, contextAtMinute(context, 180));
+  assert.ok(end.altitude < minAltitude);
+
+  assert.throws(
+    () => planetPlan(context, id, minAltitude),
+    (error) => error.code === "PLAN_CONSTRAINT_FAILED" && error.details.violations.some(
+      (violation) => violation.reason === "MINIMUM_ALTITUDE" && violation.targetId === id &&
+        violation.minimumAltitude === end.altitude,
+    ),
+  );
+});

@@ -215,9 +215,13 @@ function normalizePlanRequest(request) {
 }
 
 function targetAtTime(object, context, date) {
+  // The catalog's planet coordinates are for the plan start, not this slot sample.
+  const position = object.isSolarSystem && object.id === "planet-" + object.name.toLowerCase()
+    ? solarSystemPositions(date).find((position) => position.name === object.name) ?? object
+    : object;
   const { alt, az } = equatorialToHorizontal(
-    object.ra,
-    object.dec,
+    position.ra,
+    position.dec,
     date,
     context.latitude,
     context.longitude,
