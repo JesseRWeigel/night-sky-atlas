@@ -250,3 +250,39 @@ test("planet altitude constraint does not accept a slot that goes below the thre
     ),
   );
 });
+
+function dubhePlan(durationMinutes, minAltitude) {
+  const context = { date: "2026-11-22T00:00:00.000Z", latitude: 40, longitude: -80 };
+  return previewObservingPlan(buildCatalogAt(context.date), {
+    previewId: "dubhe-slot",
+    title: "Dubhe slot",
+    audience: "general",
+    durationMinutes,
+    targetIds: ["star-dubhe"],
+    categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+    minAltitude,
+    context,
+    now: NYC.date,
+  });
+}
+
+test("fixed-star slot rejects a lower culmination missed by all three sampled times", () => {
+  assert.throws(
+    () => dubhePlan(180, 11.8),
+    (error) => error.code === "PLAN_CONSTRAINT_FAILED" && error.details.violations.some(
+      (violation) => violation.reason === "MINIMUM_ALTITUDE" &&
+        violation.targetId === "star-dubhe" &&
+        Math.abs(violation.minimumAltitude - 11.751) < 1e-9,
+    ),
+  );
+});
+
+test("fixed-star slot reports lower culmination only if it falls inside the slot", () => {
+  const entire = dubhePlan(180, 11.7).targets[0];
+  assert.ok(Math.abs(entire.minimumAltitude - 11.751) < 1e-9);
+  const short = dubhePlan(10, 11.77).targets[0];
+  const atEnd = getTargetAtContext("star-dubhe", {
+    date: "2026-11-22T00:10:00.000Z", latitude: 40, longitude: -80,
+  });
+  assert.equal(short.minimumAltitude, atEnd.altitude);
+});

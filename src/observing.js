@@ -1,4 +1,4 @@
-import { equatorialToHorizontal, solarSystemPositions } from "./astronomy.js";
+import { equatorialToHorizontal, gmstDeg, norm360, solarSystemPositions } from "./astronomy.js";
 import { CATALOG, DEEP_SKY, SOLAR_SYSTEM_INFO, STARS } from "./catalog.js";
 import { AppError } from "./app-error.js";
 
@@ -229,6 +229,19 @@ function targetAtTime(object, context, date) {
   return { altitude: alt, azimuth: az };
 }
 
+function lowerCulminationAltitude(object, context, start, end) {
+  // A fixed target reaches its geometric minimum at hour angle 180 degrees.
+  // Slots under one sidereal day let us compare forward angular distances,
+  // including when sidereal time wraps through zero.
+  const startSidereal = gmstDeg(start);
+  const hourAngle = startSidereal + context.longitude - object.ra;
+  const toCulmination = norm360(180 - hourAngle);
+  const slotSweep = norm360(gmstDeg(end) - startSidereal);
+  if (toCulmination > slotSweep) return Infinity;
+  // At 180 degrees, sin(altitude) = -cos(latitude + declination).
+  return Math.abs(context.latitude + object.dec) - 90;
+}
+
 export function previewObservingPlan(catalog, request) {
   if (!Array.isArray(catalog)) throw invalidInput("catalog must be an array");
   const normalizedRequest = normalizePlanRequest(request);
@@ -269,7 +282,10 @@ export function previewObservingPlan(catalog, request) {
       normalizedRequest.context,
       date,
     ));
-    const minimumAltitude = Math.min(...samples.map((sample) => sample.altitude));
+    const sampledMinimum = Math.min(...samples.map((sample) => sample.altitude));
+    const minimumAltitude = object.isSolarSystem
+      ? sampledMinimum
+      : Math.min(sampledMinimum, lowerCulminationAltitude(object, normalizedRequest.context, slotStart, slotEnd));
     const midpoint = samples[1];
     const target = {
       targetId: object.id,
