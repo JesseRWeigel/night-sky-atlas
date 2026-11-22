@@ -26,7 +26,9 @@ person using the site.
 
 1. Select **Plan**, then create a plan from objects you select in the atlas.
 2. Edit the title, audience, duration, notes, and target order. The planner
-   shows each target's scheduled slot and minimum altitude.
+   shows each target's scheduled slot and minimum altitude. For fixed targets, the
+   minimum includes any lower culmination inside the slot; for planets, it is
+   sampled at the start, midpoint, and end.
 3. Save the plan, then start the tour to frame targets and advance the
    observer time one slot at a time.
 
