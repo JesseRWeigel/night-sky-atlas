@@ -12,6 +12,18 @@ const recipe = {
 test("labels the unchanged instant and the browser zone, not an original calendar zone", () => {
   assert.match(formatPortableTime(utc, "America/Los_Angeles"), /2026-08-29T01:00:00.000Z.*America\/Los_Angeles.*Aug 28, 2026.*6:00 PM/);
 });
+test("distinguishes repeated browser wall times when daylight saving ends", () => {
+  const zone = "America/New_York";
+  const first = formatPortableTime("2026-11-01T05:30:00.000Z", zone);
+  const second = formatPortableTime("2026-11-01T06:30:00.000Z", zone);
+  assert.match(first, /05:30:00\.000Z.*Nov 1, 2026.*1:30 AM GMT-4$/);
+  assert.match(second, /06:30:00\.000Z.*Nov 1, 2026.*1:30 AM GMT-5$/);
+});
+test("labels the actual fractional offset when local time rolls into another day", () => {
+  const nextDayUtc = "2026-08-29T20:30:00.000Z";
+  assert.match(formatPortableTime(nextDayUtc, "Asia/Kathmandu"),
+    /2026-08-29T20:30:00\.000Z.*Asia\/Kathmandu.*Aug 30, 2026.*2:15 AM GMT\+5:45$/);
+});
 test("import previews the shared UTC and IDs against only the local observer", () => {
   const preview = previewPortableAtLocation(JSON.stringify(recipe), location);
   assert.equal(preview.context.date, utc);

@@ -3,8 +3,12 @@ import { decodePortablePlan, encodePortablePlan } from "./portable-plan.js";
 
 export function formatPortableTime(utc, timezone = Intl.DateTimeFormat().resolvedOptions().timeZone) {
   const local = new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "shortOffset",
     timeZone: timezone,
   }).format(new Date(utc));
   return `UTC: ${utc} · Browser time (${timezone}): ${local}`;
