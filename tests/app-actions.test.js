@@ -226,6 +226,53 @@ test("tour rejects location mismatch before mutating progress", () => {
   assert.deepEqual(state, snapshot);
 });
 
+function antimeridianPlan(actions, state) {
+  actions.setObserverLocation({ latitude: 50, longitude: 180, locationName: "Dateline" });
+  actions.createManualPlan({ title: "Dateline tour", audience: "general", durationMinutes: 20 });
+  actions.addTargetToPlan("star-polaris");
+  actions.addTargetToPlan("star-dubhe");
+  actions.savePlan({ previewId: state.planPreview.id });
+}
+
+test("tour starts from the same longitude expressed as negative 180 degrees", () => {
+  const { actions, state } = harness();
+  antimeridianPlan(actions, state);
+  actions.setObserverLocation({ latitude: 50, longitude: -180, locationName: "Dateline" });
+
+  const result = actions.advanceTour({ direction: "start" });
+
+  assert.equal(result.target.id, "star-polaris");
+  assert.equal(state.plan.context.longitude, 180);
+  assert.equal(state.longitude, -180);
+});
+
+test("startup restores the target and permits advancement across the antimeridian tolerance", () => {
+  const prior = harness();
+  antimeridianPlan(prior.actions, prior.state);
+  prior.actions.advanceTour({ direction: "start" });
+  const { actions, state } = harness();
+  actions.setObserverLocation({ latitude: 50, longitude: -179.99995, locationName: "Dateline" });
+  actions.setObserverTime({ isoTime: "2026-08-29T04:00:00.000Z" });
+
+  appActionsModule.restoreSavedPlan(state, prior.state.plan);
+
+  assert.equal(state.selected?.id, "star-polaris");
+  assert.equal(state.date.toISOString(), prior.state.plan.targets[0].scheduledTime);
+  assert.equal(actions.advanceTour({ direction: "next" }).target.id, "star-dubhe");
+});
+
+test("tour still rejects a longitude beyond the tolerance across the antimeridian", () => {
+  const { actions, state } = harness();
+  antimeridianPlan(actions, state);
+  actions.setObserverLocation({ latitude: 50, longitude: -179.99, locationName: "Dateline" });
+  const snapshot = structuredClone(state);
+  assert.throws(
+    () => actions.advanceTour({ direction: "start" }),
+    (error) => error.code === "LOCATION_MISMATCH",
+  );
+  assert.deepEqual(state, snapshot);
+});
+
 test("manual target edits and tour advancement share the saved plan state", () => {
   const { actions, changes, state } = harness();
   actions.createManualPlan({ title: "Manual", audience: "general", durationMinutes: 20 });

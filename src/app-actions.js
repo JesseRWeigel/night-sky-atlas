@@ -96,6 +96,14 @@ function normalizeDraft(draft) {
   };
 }
 
+function observerMatchesPlan(planContext, observer) {
+  const tolerance = 0.0001;
+  const longitudeDelta = Math.abs(planContext.longitude - observer.longitude);
+  // Longitudes +180° and -180° represent the same meridian.
+  return Math.abs(planContext.latitude - observer.latitude) <= tolerance &&
+    (longitudeDelta <= tolerance || Math.abs(360 - longitudeDelta) <= tolerance);
+}
+
 export function restoreSavedPlan(state, storedPlan) {
   if (!storedPlan) return null;
   try {
@@ -107,9 +115,7 @@ export function restoreSavedPlan(state, storedPlan) {
     let targetDate = null;
     let target = null;
     let horizontal = null;
-    const locationMatches = Math.abs(plan.context.latitude - state.latitude) <= 0.0001 &&
-      Math.abs(plan.context.longitude - state.longitude) <= 0.0001;
-    if (active && locationMatches) {
+    if (active && observerMatchesPlan(plan.context, state)) {
       const targetSlot = plan.targets[plan.currentIndex];
       targetDate = new Date(targetSlot.scheduledTime);
       const catalog = buildCatalogAt(targetDate.toISOString());
@@ -541,7 +547,7 @@ export function createAppActions({
     const hasTargetIndex = Object.hasOwn(input, "targetIndex");
     if (hasDirection === hasTargetIndex) throw invalidInput("provide exactly one of direction or targetIndex");
     const plan = state.plan;
-    if (Math.abs(plan.context.latitude - state.latitude) > 0.0001 || Math.abs(plan.context.longitude - state.longitude) > 0.0001) {
+    if (!observerMatchesPlan(plan.context, state)) {
       throw new AppError("LOCATION_MISMATCH", "Plan location does not match the current observer location", {
         planLocation: plan.context,
         observerLocation: context(),
