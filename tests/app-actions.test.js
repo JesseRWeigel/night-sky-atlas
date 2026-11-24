@@ -545,3 +545,45 @@ test("preview rejects observer names that persistence cannot store", () => {
   assert.deepEqual(state, snapshot);
   assert.deepEqual(changes, []);
 });
+
+for (const [description, isoTime] of [
+  ["ambiguous wall time", "2026-11-01T01:30:00"],
+  ["date without time", "2026-11-01"],
+  ["non-ISO date", "November 1, 2026"],
+  ["impossible leap day", "2026-02-29T23:30:00-05:00"],
+]) {
+  test(`observer time rejects ${description} without moving the sky`, () => {
+    const { actions, changes, state } = harness();
+    const before = structuredClone(state);
+    assert.throws(() => actions.setObserverTime({ isoTime }), { code: "INVALID_INPUT" });
+    assert.deepEqual(state, before);
+    assert.deepEqual(changes, []);
+  });
+}
+
+test("explicit repeated-hour offsets select distinct sky instants and leap-day offset crosses midnight", () => {
+  const { actions, changes, state } = harness();
+  for (const [input, expected] of [
+    ["2026-11-01T01:30:00-04:00", "2026-11-01T05:30:00.000Z"],
+    ["2026-11-01T01:30:00-05:00", "2026-11-01T06:30:00.000Z"],
+    ["2028-02-29T23:30:00-05:00", "2028-03-01T04:30:00.000Z"],
+  ]) {
+    actions.setObserverTime({ isoTime: input });
+    assert.equal(state.date.toISOString(), expected);
+  }
+  assert.equal(changes.length, 3);
+});
+
+test("target details and plan preview also require an explicit time zone", () => {
+  const { actions, changes } = harness();
+  const ambiguousTime = "2026-11-01T01:30:00";
+  assert.throws(() => actions.getTargetDetails("star-vega", ambiguousTime), { code: "INVALID_INPUT" });
+  assert.throws(() => actions.previewPlan({
+    title: "An evening sky", audience: "general", durationMinutes: 20,
+    targetIds: ["star-vega"],
+    categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+    minAltitude: 0,
+    startTime: ambiguousTime,
+  }), { code: "INVALID_INPUT" });
+  assert.deepEqual(changes, []);
+});

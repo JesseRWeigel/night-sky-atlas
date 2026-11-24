@@ -16,8 +16,15 @@ function invalidInput(message, details = undefined) {
 }
 
 function requireIsoTime(value, field) {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw invalidInput(`${field} must be an ISO date string`);
+  // Date parsing otherwise interprets a timezone-less timestamp in the
+  // browser's timezone and normalizes dates such as February 29 in a non-leap year.
+  const parts = typeof value === "string" && /^([+-]\d{6}|\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/i.exec(value);
+  if (!parts) throw invalidInput(`${field} must be an ISO date-time with a UTC offset or Z`);
+  const [year, month, day] = parts.slice(1).map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > monthDays[month - 1]) {
+    throw invalidInput(`${field} must be a valid date`);
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) throw invalidInput(`${field} must be a valid date`);

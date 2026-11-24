@@ -47,6 +47,9 @@ the regular manual experience when WebMCP is unavailable.
 
 The tools have strict schemas. Read tools report `readOnlyHint: true`; write
 tools have `readOnlyHint: false` and visibly update the same atlas.
+When supplying `iso_time`, `at_time`, or `start_time`, include `Z` or an
+explicit offset such as `-05:00` so the request means the same instant in
+every browser.
 
 | Type | Tool | What it does |
 | --- | --- | --- |
