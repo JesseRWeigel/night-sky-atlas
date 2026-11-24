@@ -253,14 +253,17 @@ export function angularSeparation(aRa, aDec, bRa, bDec) {
 }
 
 export function formatRa(degrees) {
-  const hours = norm360(degrees) / 15;
-  const h = Math.floor(hours);
-  const minutes = (hours - h) * 60;
+  // Round before splitting the fields so that 60.0m carries, including at 24h.
+  const tenthsOfMinute = Math.round(norm360(degrees) * 40) % (24 * 600);
+  const h = Math.floor(tenthsOfMinute / 600);
+  const minutes = (tenthsOfMinute % 600) / 10;
   return `${String(h).padStart(2, "0")}h ${minutes.toFixed(1).padStart(4, "0")}m`;
 }
 
 export function formatDec(degrees) {
   const sign = degrees < 0 ? "−" : "+";
-  const value = Math.abs(degrees);
-  return `${sign}${Math.floor(value).toString().padStart(2, "0")}° ${(value % 1 * 60).toFixed(0).padStart(2, "0")}′`;
+  const totalMinutes = Math.round(Math.abs(degrees) * 60);
+  const wholeDegrees = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${sign}${String(wholeDegrees).padStart(2, "0")}° ${String(minutes).padStart(2, "0")}′`;
 }

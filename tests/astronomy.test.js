@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   angularSeparation,
   equatorialToHorizontal,
+  formatDec,
+  formatRa,
   gmstDeg,
   horizontalToEquatorial,
   julianDate,
@@ -122,4 +124,27 @@ test("Mars and Jupiter are closely paired on NASA's November 2026 skywatching da
   const mars = objects.find((object) => object.name === "Mars");
   const jupiter = objects.find((object) => object.name === "Jupiter");
   close(angularSeparation(mars.ra, mars.dec, jupiter.ra, jupiter.dec), 1.2, 0.3, "Mars–Jupiter pairing");
+});
+
+test("right ascension rounding carries into the next hour", () => {
+  assert.equal(formatRa(29.98), "01h 59.9m");
+  assert.equal(formatRa(29.99), "02h 00.0m");
+});
+
+test("right ascension rounding wraps at midnight and normalizes negative angles", () => {
+  assert.equal(formatRa(359.99), "00h 00.0m");
+  assert.equal(formatRa(-0.01), "00h 00.0m");
+  assert.equal(formatRa(360.25), "00h 01.0m");
+});
+
+test("declination rounding carries into the next degree and preserves hemisphere", () => {
+  assert.equal(formatDec(44.99), "+44° 59′");
+  assert.equal(formatDec(44.999), "+45° 00′");
+  assert.equal(formatDec(-44.999), "−45° 00′");
+});
+
+test("declination rounding reaches both poles without overflowing them", () => {
+  assert.equal(formatDec(89.999), "+90° 00′");
+  assert.equal(formatDec(-89.999), "−90° 00′");
+  assert.equal(formatDec(-0.001), "−00° 00′");
 });
