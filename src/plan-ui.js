@@ -94,7 +94,7 @@ function renderTargets(targets = [], mode) {
 function renderEmpty() {
   return `<section class="plan-state plan-empty-state">
     <span class="plan-state-label">No route yet</span>
-    <h3>Build a night worth remembering.</h3>
+    <h3 tabindex="-1">Build a night worth remembering.</h3>
     <p>Select a target in the sky and add it here, or create a plan and fill the route as you explore.</p>
     <button type="button" class="plan-primary-action" data-action="create-plan">Create plan</button>
   </section>`;
@@ -126,7 +126,7 @@ function renderPreview(preview) {
     </div>
     ${renderTargets(preview.targets, "preview")}
     <div class="plan-footer-actions">
-      <button type="button" class="plan-secondary-action" data-action="dismiss-plan">${isAgent ? "Dismiss preview" : "Close"}</button>
+      <button type="button" class="plan-secondary-action" data-action="${isAgent ? "dismiss-preview" : "close-plan"}">${isAgent ? "Dismiss preview" : "Close"}</button>
       <button type="button" class="plan-primary-action" data-action="save-plan"${targetCount === 0 ? " disabled" : ""}>${isAgent ? "Save this plan" : "Save plan"}</button>
     </div>
   </section>`;
@@ -135,7 +135,7 @@ function renderPreview(preview) {
 function renderSaved(plan) {
   return `<section class="plan-state plan-saved-state">
     <span class="plan-state-label">Saved route</span>
-    <h3>${escapeHtml(plan.title)}</h3>
+    <h3 tabindex="-1">${escapeHtml(plan.title)}</h3>
     ${renderContext(plan.context)}
     ${renderTargets(plan.targets, "saved")}
     <div class="plan-footer-actions">
@@ -151,7 +151,7 @@ function renderTour(plan, tour) {
   const progress = targets.length ? `Target ${index + 1} of ${targets.length}` : "No targets";
   return `<section class="plan-state plan-tour-state">
     <span class="plan-state-label">Tour in progress</span>
-    <h3>${escapeHtml(plan.title)}</h3>
+    <h3 tabindex="-1">${escapeHtml(plan.title)}</h3>
     <p class="plan-progress" aria-live="polite">${progress}</p>
     ${renderTargets(targets, "tour")}
     <div class="plan-footer-actions plan-tour-actions">
@@ -222,7 +222,13 @@ export function mountPlanUi({
         direction: action === "move-earlier" ? "earlier" : "later",
       });
     }
-    if (action === "dismiss-plan") {
+    if (action === "dismiss-preview") {
+      actions.dismissPlanPreview({ previewId: getSnapshot().preview?.id });
+      render();
+      root.querySelector("h3")?.focus();
+      return;
+    }
+    if (action === "close-plan") {
       close();
       return;
     }
