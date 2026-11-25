@@ -476,3 +476,31 @@ test("mounted planner close control returns focus to the Plan toggle", () => {
   assert.equal(closeCount, 1);
   assert.equal(toggle.focusCount, 1);
 });
+
+test("Dismiss preview returns to the saved route instead of merely closing the panel", () => {
+  const document = new FakeEventTarget();
+  const root = new FakeEventTarget(document);
+  const toggle = new FakeEventTarget(document);
+  const snapshot = {
+    plan: { title: "Saved route", targets: [] },
+    preview: { id: "agent-1", source: "agent", title: "Proposal", targets: [] },
+  };
+  const heading = new FakeEventTarget(document);
+  root.querySelector = (selector) => selector === "h3" ? heading : null;
+  const dismissed = [];
+  const actions = {
+    dismissPlanPreview(input) {
+      dismissed.push(input);
+      snapshot.preview = null;
+    },
+  };
+  const ui = mountPlanUi({ root, toggle, actions, getSnapshot: () => snapshot });
+  ui.render();
+  assert.match(root.innerHTML, /Dismiss preview/);
+  const action = root.innerHTML.match(/data-action="([^"]+)"[^>]*>Dismiss preview/)[1];
+  root.dispatch("click", { target: actionTarget({ action }) });
+  assert.deepEqual(dismissed, [{ previewId: "agent-1" }]);
+  assert.match(root.innerHTML, /Saved route/);
+  assert.doesNotMatch(root.innerHTML, /Dismiss preview/);
+  assert.equal(heading.focusCount, 1);
+});

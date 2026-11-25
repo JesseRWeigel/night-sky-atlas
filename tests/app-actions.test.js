@@ -587,3 +587,32 @@ test("target details and plan preview also require an explicit time zone", () =>
   }), { code: "INVALID_INPUT" });
   assert.deepEqual(changes, []);
 });
+
+test("discarding an agent preview leaves saved tour progress and storage intact", () => {
+  const { actions, state, stored } = harness();
+  actions.createManualPlan({ title: "Saved tour", audience: "general", durationMinutes: 20 });
+  actions.addTargetToPlan("star-vega");
+  actions.addTargetToPlan("star-arcturus");
+  actions.savePlan({ previewId: state.planPreview.id });
+  actions.advanceTour({ direction: "start" });
+  const saved = structuredClone(state.plan);
+  const persisted = stored.get(PLAN_STORAGE_KEY);
+  const { preview } = actions.previewPlan({
+    title: "Alternative",
+    audience: "general",
+    durationMinutes: 10,
+    targetIds: ["star-vega"],
+    minAltitude: 0,
+    categoryRequirements: { planet: 0, bright_star: 1, deep_sky: 0 },
+    source: "agent",
+  });
+
+  assert.throws(() => actions.dismissPlanPreview({ previewId: "stale" }),
+    (error) => error.code === "PLAN_PREVIEW_NOT_FOUND");
+  assert.equal(state.planPreview, preview);
+  actions.dismissPlanPreview({ previewId: preview.id });
+  assert.equal(state.planPreview, null);
+  assert.deepEqual(state.plan, saved);
+  assert.equal(stored.get(PLAN_STORAGE_KEY), persisted);
+  assert.equal(actions.advanceTour({ direction: "next" }).target.id, "star-arcturus");
+});

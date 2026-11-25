@@ -380,6 +380,16 @@ export function createAppActions({
     return { preview };
   };
 
+  const dismissPlanPreview = (input) => {
+    requireObject(input, "dismiss request");
+    const preview = state.planPreview;
+    if (!preview || preview.source !== "agent" || input.previewId !== preview.id) {
+      throw new AppError("PLAN_PREVIEW_NOT_FOUND", "The requested agent preview is not current", { previewId: input.previewId });
+    }
+    state.planPreview = null;
+    emit("plan-preview-dismissed", "Dismissed the proposed plan", { previewId: preview.id });
+  };
+
   const savePlan = (input) => {
     requireObject(input, "save request");
     if (!state.planPreview || input.previewId !== state.planPreview.id) {
@@ -629,6 +639,7 @@ export function createAppActions({
     setObserverTime,
     frameTarget,
     previewPlan,
+    dismissPlanPreview,
     savePlan,
     advanceTour,
     configureLayers,
