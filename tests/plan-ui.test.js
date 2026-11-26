@@ -504,3 +504,52 @@ test("Dismiss preview returns to the saved route instead of merely closing the p
   assert.doesNotMatch(root.innerHTML, /Dismiss preview/);
   assert.equal(heading.focusCount, 1);
 });
+
+test("planner keeps keyboard focus on a reordered target, even at the move boundary", () => {
+  const document = new FakeEventTarget();
+  const root = new FakeEventTarget(document);
+  const toggle = new FakeEventTarget(document);
+  const targetId = 'target "with brackets]"';
+  let rendered = [];
+  let row;
+  let atBoundary = false;
+
+  function focusable(dataset, disabled = false) {
+    return { dataset, disabled, focus() { document.activeElement = this; } };
+  }
+  Object.defineProperty(root, "innerHTML", {
+    set() {
+      if (root.contains(document.activeElement)) document.activeElement = null;
+      rendered = [
+        focusable({ action: "move-earlier", targetId }, atBoundary),
+        focusable({ action: "move-earlier", targetId: "another-target" }),
+      ];
+      row = focusable({ targetId });
+    },
+  });
+  root.contains = (el) => Boolean(el && (rendered.includes(el) || el === row));
+  root.querySelectorAll = (selector) => {
+    if (selector === "[data-action]") return rendered;
+    if (selector === ".plan-target[data-target-id]") return [row];
+    return [];
+  };
+  root.querySelector = () => null;
+  const ui = mountPlanUi({ root, toggle, actions: {}, getSnapshot: () => ({}) });
+  ui.render();
+  rendered[0].focus();
+  const original = rendered[0];
+  ui.render();
+  assert.notEqual(original, rendered[0]);
+  assert.equal(document.activeElement, rendered[0]);
+
+  atBoundary = true;
+  ui.render();
+  assert.equal(document.activeElement, row);
+  ui.render();
+  assert.equal(document.activeElement, row);
+
+  const outside = focusable({});
+  outside.focus();
+  ui.render();
+  assert.equal(document.activeElement, outside);
+});
