@@ -180,7 +180,8 @@ export function mountPlanUi({
 }) {
   const render = () => {
     const active = root.ownerDocument.activeElement;
-    const activeField = active && root.contains(active) ? active.dataset.field : null;
+    const activeData = active && root.contains(active) ? active.dataset : null;
+    const activeField = activeData?.field;
     const selection = activeField && Number.isInteger(active.selectionStart) && Number.isInteger(active.selectionEnd)
       ? { start: active.selectionStart, end: active.selectionEnd, direction: active.selectionDirection || "none" }
       : null;
@@ -191,6 +192,15 @@ export function mountPlanUi({
       if (selection && typeof replacement.setSelectionRange === "function") {
         replacement.setSelectionRange(selection.start, selection.end, selection.direction);
       }
+    } else if (activeData?.action || activeData?.targetId !== undefined) {
+      // Match the old control by identity, not list position or selector text.
+      const control = activeData.action && [...root.querySelectorAll("[data-action]")]
+        .find(({ dataset, disabled }) => !disabled &&
+          dataset.action === activeData.action &&
+          dataset.targetId === activeData.targetId && dataset.index === activeData.index);
+      const row = activeData.targetId !== undefined && [...root.querySelectorAll(".plan-target[data-target-id]")]
+        .find((item) => item.dataset.targetId === activeData.targetId);
+      (control || row || root.querySelector("h3") || root.querySelector('[data-field="title"]'))?.focus();
     }
   };
   const close = () => {
