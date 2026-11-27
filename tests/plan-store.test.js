@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   PLAN_STORAGE_KEY,
   clearPlan,
+  getBrowserStorage,
   loadPlan,
   savePlan,
 } from "../src/plan-store.js";
@@ -118,4 +119,20 @@ test("plan loading rejects missing metadata, invalid duration bounds, and incons
     storage.setItem(PLAN_STORAGE_KEY, JSON.stringify(plan));
     assert.equal(loadPlan(storage), null, label);
   }
+});
+
+test("reading a blocked localStorage getter leaves persistence unavailable without breaking startup", () => {
+  const blockedWindow = {
+    get localStorage() { throw new DOMException("Access denied", "SecurityError"); },
+  };
+  const storage = getBrowserStorage(blockedWindow);
+  assert.equal(storage, null);
+  assert.equal(loadPlan(storage), null);
+  assert.throws(() => savePlan(storage, validPlan), { code: "PERSISTENCE_UNAVAILABLE" });
+});
+
+test("allowed browser storage still restores a saved observing plan", () => {
+  const storage = memoryStorage();
+  savePlan(storage, validPlan);
+  assert.deepEqual(loadPlan(getBrowserStorage({ localStorage: storage })), validPlan);
 });

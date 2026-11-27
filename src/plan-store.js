@@ -2,6 +2,16 @@ import { AppError } from "./app-error.js";
 
 export const PLAN_STORAGE_KEY = "night-sky-observing-plan:v1";
 
+// Access itself can throw (for example, in a sandboxed embed or when
+// the browser blocks storage). The atlas still works for this page.
+export function getBrowserStorage(browserWindow) {
+  try {
+    return browserWindow.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const TARGET_CATEGORIES = new Set(["planet", "bright_star", "deep_sky"]);
 const TARGET_STATUSES = new Set(["upcoming", "current", "complete"]);
 const AUDIENCES = new Set(["child", "beginner", "general", "experienced"]);
