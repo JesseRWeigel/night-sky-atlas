@@ -17,11 +17,12 @@ import {
 import { AppError } from "./app-error.js";
 import { createAppActions, restoreSavedPlan } from "./app-actions.js";
 import { CATALOG, CONSTELLATION_LINES, DEEP_SKY, SOLAR_SYSTEM_INFO, STARS } from "./catalog.js";
-import { loadPlan } from "./plan-store.js";
+import { getBrowserStorage, loadPlan } from "./plan-store.js";
 import { mountPortablePlanUi } from "./portable-plan-ui.js";
 import { mountPlanUi, planChipPresentation } from "./plan-ui.js";
 import { setupWebMcp } from "./webmcp.js";
 
+const storage = getBrowserStorage(window);
 const $ = (selector) => document.querySelector(selector);
 const canvas = $("#skyCanvas");
 const ctx = canvas.getContext("2d");
@@ -825,7 +826,7 @@ function setLocation(latitude, longitude, name = "Custom location") {
 
 function restoreLocation() {
   try {
-    const saved = JSON.parse(localStorage.getItem("night-sky-location"));
+    const saved = JSON.parse(storage?.getItem("night-sky-location"));
     if (Number.isFinite(saved?.latitude) && Number.isFinite(saved?.longitude)) setLocation(saved.latitude, saved.longitude, saved.name || "Saved location");
   } catch {}
 }
@@ -908,7 +909,7 @@ function onStateChanged(change) {
 
 const actions = createAppActions({
   state,
-  storage: window.localStorage,
+  storage,
   effects: { onStateChanged },
   createId: (prefix) => `${prefix}-${typeof window.crypto?.randomUUID === "function" ? window.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`,
 });
@@ -1213,7 +1214,7 @@ function init() {
   state.centerRa = center.ra;
   state.centerDec = center.dec;
   restoreLocation();
-  restoreSavedPlan(state, loadPlan(window.localStorage));
+  restoreSavedPlan(state, loadPlan(storage));
   planUi = mountPlanUi({
     root: $("#planContent"),
     toggle: $("#planToggle"),

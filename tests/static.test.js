@@ -80,3 +80,11 @@ test("submission documentation names the baseline, tools, demo, and license audi
   assert.match(combined, /MIT License/);
   assert.match(combined, /September 3, 2026.*1:00 PM PDT/i);
 });
+
+test("atlas obtains optional storage once instead of reading a throwing browser getter during boot", async () => {
+  const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
+  assert.match(app, /const storage = getBrowserStorage\(window\)/);
+  assert.match(app, /createAppActions\(\{\s*state,\s*storage,/);
+  assert.match(app, /restoreSavedPlan\(state, loadPlan\(storage\)\)/);
+  assert.doesNotMatch(app, /\blocalStorage\b/);
+});
