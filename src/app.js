@@ -1,3 +1,4 @@
+import { createLocationRequest } from "./location-request.js";
 import { skyShortcut } from "./keyboard.js";
 import {
   angularSeparation,
@@ -872,11 +873,18 @@ function setPlanPanelOpen(open) {
   $("#planToggle").setAttribute("aria-expanded", String(open));
 }
 
+const locationRequest = createLocationRequest({
+  getGeolocation: () => navigator.geolocation,
+  showMessage: (text) => { $("#locationMessage").textContent = text; },
+  apply: (latitude, longitude) => setLocation(latitude, longitude, "Current location"),
+});
+
 function onStateChanged(change) {
   if (change.type === "observer-location" || change.type === "observer-time") {
     state.lastCatalogUpdate = 0;
   }
   if (change.type === "observer-location") {
+    locationRequest.invalidate();
     portablePlanUi.invalidateLocation();
     syncLocationControls();
     updateTimeUi();
@@ -1054,21 +1062,12 @@ function bindControls() {
       return;
     }
     $("#sitePreset").value = "custom";
-    $("#locationMessage").textContent = "Custom coordinates applied.";
     setLocation(lat, lon, "Custom location");
+    $("#locationMessage").textContent = "Custom coordinates applied.";
   };
   $("#latitudeInput").addEventListener("change", commitCoordinates);
   $("#longitudeInput").addEventListener("change", commitCoordinates);
-  $("#useLocation").addEventListener("click", () => {
-    const message = $("#locationMessage");
-    if (!navigator.geolocation) { message.textContent = "This browser does not provide geolocation."; return; }
-    message.textContent = "Requesting your location…";
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => { setLocation(coords.latitude, coords.longitude, "Current location"); message.textContent = `Location accurate to about ${Math.round(coords.accuracy)} m.`; },
-      (error) => { message.textContent = `Location unavailable: ${error.message}`; },
-      { enableHighAccuracy: true, timeout: 12000 },
-    );
-  });
+  $("#useLocation").addEventListener("click", locationRequest.request);
 
   dateTimeInput.addEventListener("change", () => {
     const date = new Date(`${dateTimeInput.value}Z`);
